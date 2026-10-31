@@ -1,12 +1,12 @@
 // 업무일지: 날짜 + 선생님 → 시간표에서 학생 행 자동 생성, 자동 저장, A4 인쇄
-import { api } from '../api.js';
+import { api } from '../api.js?v=202611010012';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, versionFor, worklogRows, logRows,
   itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts, prevHomeworkMap,
-} from '../store.js';
-import { studentLink } from '../studentcard.js';
-import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js';
-import { printWorklogs } from '../print.js';
+} from '../store.js?v=202611010012';
+import { studentLink } from '../studentcard.js?v=202611010012';
+import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611010012';
+import { printWorklogs } from '../print.js?v=202611010012';
 
 let root, date, teacherId, log, rows, hints, prevHw = {}, saveState = 'idle';
 const REVIEW_TEMPLATE = '* 수업 전반 평가:\n* 필요한 개선 사항:\n* 다음 수업 목표 또는 계획:';

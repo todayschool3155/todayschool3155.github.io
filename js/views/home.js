@@ -1,12 +1,12 @@
 // 홈 대시보드: 오늘 수업 · 일지 미작성 알림 · 숙제 현황 · 이번 달 출결 · 주의 학생 · 최근 테스트 · 최근 변경
-import { api } from '../api.js';
+import { api } from '../api.js?v=202611010012';
 import {
   state, isAdmin, academyName, teacherById, studentById, slots, worklogRows, isStudentItem, holidayOf, holidays,
   isClassDay, alertRange, trackingStart, missingLogs, homeworkStatus, alerts, attendanceStats, attendanceRate, pct, versionFor,
-} from '../store.js';
-import { esc, today, addDays, fmtDate, fmtDateTime, fmtTime, guard, DAY_NAMES, weekday } from '../util.js';
-import { studentLink } from '../studentcard.js';
-import { num } from '../chart.js';
+} from '../store.js?v=202611010012';
+import { esc, today, addDays, fmtDate, fmtDateTime, fmtTime, guard, DAY_NAMES, weekday } from '../util.js?v=202611010012';
+import { studentLink } from '../studentcard.js?v=202611010012';
+import { num } from '../chart.js?v=202611010012';
 
 export async function render(el) {
   el.innerHTML = '<div class="loading">불러오는 중…</div>';

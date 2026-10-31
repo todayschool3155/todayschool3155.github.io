@@ -1,10 +1,10 @@
 // 테스트 성적: 금요 테스트 등 입력·조회·인쇄 (관리자·선생님 모두 입력 가능)
-import { api } from '../api.js';
-import { state, isAdmin, activeStudents, studentById, versionFor, cellOf, slots, dayOfDate, DAYS, teacherById } from '../store.js';
-import { esc, $, today, addDays, addMonths, fmtDate, fmtDateTime, toast, guard, confirmBox, modal, weekday, DAY_NAMES } from '../util.js';
-import { num } from '../chart.js';
-import { studentLink } from '../studentcard.js';
-import { printTest } from '../print.js';
+import { api } from '../api.js?v=202611010012';
+import { state, isAdmin, activeStudents, studentById, versionFor, cellOf, slots, dayOfDate, DAYS, teacherById } from '../store.js?v=202611010012';
+import { esc, $, today, addDays, addMonths, fmtDate, fmtDateTime, toast, guard, confirmBox, modal, weekday, DAY_NAMES } from '../util.js?v=202611010012';
+import { num } from '../chart.js?v=202611010012';
+import { studentLink } from '../studentcard.js?v=202611010012';
+import { printTest } from '../print.js?v=202611010012';
 
 const DEFAULT_ITEMS = { 영어: ['듣기', '문법'], 수학: ['개별', '공통'] };
 let root, tests = [], months = 3, cur = null, dirty = false;

@@ -1,8 +1,8 @@
 // 관리: 선생님, 로그인 계정, 교시, 학원명, 데이터 보관/백업
-import { api, DEMO } from '../api.js';
-import { state, reload, slots, teacherById, academyName, holidays, versionFor, applyFromDate, cellOf, setCell, DAYS } from '../store.js';
-import { esc, $, today, addDays, addMonths, fmtDateTime, toast, guard, formModal, confirmBox, download, modal } from '../util.js';
-import { exportWorklogsXlsx } from '../excel.js';
+import { api, DEMO } from '../api.js?v=202611010012';
+import { state, reload, slots, teacherById, academyName, holidays, versionFor, applyFromDate, cellOf, setCell, DAYS } from '../store.js?v=202611010012';
+import { esc, $, today, addDays, addMonths, fmtDateTime, toast, guard, formModal, confirmBox, download, modal } from '../util.js?v=202611010012';
+import { exportWorklogsXlsx } from '../excel.js?v=202611010012';
 
 let root, users = [], stats = null, showRetired = false;
 // 학원 로고 3색(노랑·주황·초록)의 밝은 단계 — 시간표 칸 배경용

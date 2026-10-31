@@ -1,14 +1,14 @@
-import { api, DEMO, getToken } from './api.js';
-import { state, reload, isAdmin, academyName, alerts, refreshAlerts } from './store.js';
-import { esc, $, toast, guard, formModal, confirmBox } from './util.js';
-import * as home from './views/home.js';
-import * as timetable from './views/timetable.js';
-import * as worklog from './views/worklog.js';
-import * as students from './views/students.js';
-import * as admin from './views/admin.js';
-import * as audit from './views/audit.js';
-import * as tests from './views/tests.js';
-import * as stats from './views/stats.js';
+import { api, DEMO, getToken } from './api.js?v=202611010012';
+import { state, reload, isAdmin, academyName, alerts, refreshAlerts } from './store.js?v=202611010012';
+import { esc, $, toast, guard, formModal, confirmBox } from './util.js?v=202611010012';
+import * as home from './views/home.js?v=202611010012';
+import * as timetable from './views/timetable.js?v=202611010012';
+import * as worklog from './views/worklog.js?v=202611010012';
+import * as students from './views/students.js?v=202611010012';
+import * as admin from './views/admin.js?v=202611010012';
+import * as audit from './views/audit.js?v=202611010012';
+import * as tests from './views/tests.js?v=202611010012';
+import * as stats from './views/stats.js?v=202611010012';
 import './studentcard.js';
 
 // bottom: 휴대폰 하단 메뉴에 표시 (나머지는 우측 상단 메뉴)

@@ -1,8 +1,8 @@
 // 학생 카드: 한 학생의 수업 기록(모든 선생님) · 출결 요약 · 테스트 성적 추이
-import { api } from './api.js';
-import { isAdmin, studentById, teacherById, slotById, versionFor, placementsOf, placementText, attendanceRate, pct } from './store.js';
-import { esc, modal, guard, today, addMonths, fmtDate, toast } from './util.js';
-import { lineChart, num } from './chart.js';
+import { api } from './api.js?v=202611010012';
+import { isAdmin, studentById, teacherById, slotById, versionFor, placementsOf, placementText, attendanceRate, pct } from './store.js?v=202611010012';
+import { esc, modal, guard, today, addMonths, fmtDate, toast } from './util.js?v=202611010012';
+import { lineChart, num } from './chart.js?v=202611010012';
 
 export async function openStudentCard(sid) {
   const s = studentById(sid);
@@ -26,7 +26,7 @@ export async function openStudentCard(sid) {
       load();
       el.querySelector('#sc-report')?.addEventListener('click', async () => {
         close();
-        const { printReportsFor } = await import('./views/stats.js');
+        const { printReportsFor } = await import('./views/stats.js?v=202611010012');
         printReportsFor([s.id], today().slice(0, 7));
       });
     },

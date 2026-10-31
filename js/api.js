@@ -1,5 +1,5 @@
 // 서버 통신 계층: Supabase(RPC) 또는 데모(localStorage) 백엔드
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=202611010012';
 
 // 이 PC(localhost)에서 주소 뒤에 ?demo 를 붙이면 실제 서버 대신 데모 데이터로 시험 (실제 사이트에서는 무시)
 const LOCAL_DEMO = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).has('demo');
