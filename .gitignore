@@ -1,0 +1,16 @@
+# 학생 개인정보가 들어있는 파일 — 절대 GitHub에 올리지 않음
+data/
+supabase/seed.sql
+*.xlsx
+*.json.bak
+오늘학원_백업_*.json
+
+# 기타
+.claude/
+__pycache__/
+.DS_Store
+Thumbs.db
+node_modules/
+
+# 학원 앱과 무관한 개인 폴더 (업로드 제외)
+세계가잠든뒤/
