@@ -144,7 +144,8 @@ function drawLog() {
     ${!weekend && !rows.length ? '<div class="empty">이 날 시간표에 배정된 수업이 없습니다.</div>' : ''}
     <div class="wl-tools no-print">
       <button class="btn btn-sm" id="wl-allpresent">모두 출석</button>
-      <button class="btn btn-sm" id="wl-extra">+ 보강/추가 학생</button>
+      <button class="btn btn-sm btn-primary" id="wl-extra">+ 학생 추가</button>
+      <span class="subtle small">학생 옆 <b>수정</b>: 교시 변경 · 다른 학생으로 바꾸기 · 빼기 (오늘만 또는 시간표에 반영)</span>
     </div>
     ${removedHtml()}
     <div class="wl-list">
@@ -152,7 +153,8 @@ function drawLog() {
         const sl = slotById(s);
         const note = v?.grid?.[dayOfDate(date)]?.[s]?.[teacherId]?.note;
         return `<section class="wl-slot">
-          <h3>${esc(sl?.label || s)} <small>${esc(sl?.time || '')}</small>${note ? ` <small class="cell-note">${esc(note)}</small>` : ''}</h3>
+          <h3>${esc(sl?.label || s)} <small>${esc(sl?.time || '')}</small>${note ? ` <small class="cell-note">${esc(note)}</small>` : ''}
+            <button class="btn btn-sm slot-add no-print" data-addslot="${esc(s)}">+ 학생</button></h3>
           <div class="wl-table-head"><span>학생</span><span>출결</span><span>수업책/진도/프린트</span><span>숙제/보충</span><span>특이사항</span></div>
           ${bySlot[s].map(rowHtml).join('')}
         </section>`;
@@ -178,9 +180,9 @@ function rowHtml(r) {
     <div class="wl-name">
       ${s ? `<b>${studentLink(s.id)}</b>` : `<b class="subtle">${esc(itemLabel(r.item))}</b>`}
       ${s?.grade ? `<small>${esc(s.grade)}</small>` : ''}
-      ${r.extra ? '<span class="badge">추가</span><button class="icon-btn danger" data-rmextra aria-label="추가 학생 삭제">✕</button>' : ''}
+      ${r.extra ? '<span class="badge">오늘 추가</span>' : ''}
       ${r.orphan ? '<span class="badge badge-warn" title="시간표 변경으로 빠졌지만 작성된 기록">시간표 외</span>' : ''}
-      ${!r.extra && !r.orphan ? '<button class="icon-btn danger row-x no-print" data-rmrow aria-label="학생 빼기" title="오늘 제외 / 시간표에서 빼기">✕</button>' : ''}
+      ${!r.orphan ? '<button class="btn btn-sm row-x no-print" data-editrow aria-label="학생 수정">수정</button>' : ''}
     </div>
     <div class="att" role="group" aria-label="출결">${ATT.map((a) => `<button type="button" data-att="${a}" class="${e.att === a ? 'on att-' + a : ''}">${a}</button>`).join('')}</div>
     <input data-f="progress" value="${esc(e.progress)}" placeholder="${esc(hintP)}" aria-label="수업책/진도/프린트">
@@ -242,13 +244,11 @@ function bindLog() {
       row.classList.toggle('is-absent', en.att === '결석');
       markDirty();
     }
-    if (e.target.closest('[data-rmrow]')) { removeRow(rows.find((r) => r.key === key)); return; }
-    if (e.target.closest('[data-rmextra]')) {
-      log.extras = log.extras.filter((x) => `${x.slot}|${itemKey(x.item)}` !== key);
-      delete log.entries[key];
-      markDirty();
-      drawLog();
-    }
+    if (e.target.closest('[data-editrow]')) { editRow(rows.find((r) => r.key === key)); return; }
+  });
+  list.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-addslot]');
+    if (b) addExtra(b.dataset.addslot);
   });
   list.addEventListener('input', (e) => {
     const f = e.target.dataset.f;
@@ -275,7 +275,7 @@ function bindLog() {
     markDirty();
     drawLog();
   });
-  root.querySelector('#wl-extra').addEventListener('click', addExtra);
+  root.querySelector('#wl-extra').addEventListener('click', () => addExtra());
   root.querySelectorAll('[data-undo]').forEach((b) => b.addEventListener('click', () => {
     log.extras = log.extras.filter((x) => !(x.removed && `${x.slot}|${itemKey(x.item)}` === b.dataset.undo));
     markDirty();
@@ -290,59 +290,140 @@ function removedHtml() {
     <button class="linklike" data-undo="${esc(`${x.slot}|${itemKey(x.item)}`)}">되돌리기</button></span>`).join(' ')}</p>`;
 }
 
-// 담당 칸 시간표 변경: 이 날짜부터 적용 (이전 날짜의 일지는 그대로)
-async function changeMyCell(slot, mutate, what) {
+// ---------- 업무일지에서 학생 추가 · 수정 · 빼기 ----------
+// "오늘만" = 이 날 일지에만 반영 (extras) / "시간표" = 이 날부터 매주 같은 요일 시간표에 반영 (이후 일지 자동 반영)
+const keyOf = (slot, item) => `${slot}|${itemKey(item)}`;
+
+function todayRemove(r) {
+  if (r.extra) log.extras = (log.extras || []).filter((x) => x.removed || keyOf(x.slot, x.item) !== r.key);
+  else (log.extras ||= []).push({ slot: r.slot, item: r.item, removed: true });
+  delete log.entries[r.key];
+}
+function todayAdd(slot, item, carry) {
+  const k = keyOf(slot, item);
+  log.extras = (log.extras || []).filter((x) => !(x.removed && keyOf(x.slot, x.item) === k)); // 오늘 제외해 둔 것이면 되돌리기
+  if (!worklogRows(date, teacherId).some((r) => r.key === k)) (log.extras ||= []).push({ slot, item });
+  if (carry) log.entries[k] = { ...carry };
+}
+// 시간표(담당 칸) 여러 칸을 한 번에 바꿈 — 이 날짜부터 적용
+async function changeMyCells(mutateCells, what) {
   const d = dayOfDate(date);
   await guard(() => applyFromDate(date, (g) => {
-    const c = cellOf(g, d, slot, teacherId);
-    setCell(g, d, slot, teacherId, { ...c, items: mutate([...c.items]) });
-  }, `${teacherById(teacherId)?.name} ${what}`,
-  [`${DAY_NAMES[d]} ${slotById(slot)?.label} ${teacherById(teacherId)?.name}: ${what} (${date}부터)`]));
+    mutateCells((slot, fn) => {
+      const c = cellOf(g, d, slot, teacherId);
+      setCell(g, d, slot, teacherId, { ...c, items: fn([...c.items]) });
+    });
+  }, `${teacherById(teacherId)?.name} ${what}`, [`${DAY_NAMES[d]} ${teacherById(teacherId)?.name}: ${what} (${date}부터)`]));
+}
+async function changeMyCell(slot, mutate, what) {
+  await changeMyCells((cell) => cell(slot, mutate), what);
 }
 
-async function removeRow(r) {
+async function resolveStudent(name) {
+  let s = activeStudents().find((x) => x.name === name);
+  if (!s && await confirmBox(`"${name}"은(는) 등록된 학생이 아닙니다. 신규 학생으로 등록할까요?\n(취소하면 메모 항목으로 넣습니다)`, { ok: '신규 등록' })) {
+    s = await guard(() => api.saveStudent({ name, status: 'active', enrolled_on: date }), `${name} 학생을 등록했습니다.`);
+    await reload();
+  }
+  return s ? s.id : name;
+}
+
+async function editRow(r) {
   if (!r) return;
   const d = dayOfDate(date);
   const name = itemLabel(r.item);
-  const choice = await modal({
-    title: `${name} 빼기`,
-    body: `<p><b>${esc(name)}</b> (${esc(slotById(r.slot)?.label || '')}) 을/를 어떻게 뺄까요?</p>
-      <p class="subtle small">· 오늘만 제외: 이 날 일지에서만 빠집니다 (결석·휴강 등).<br>
-      · 시간표에서 빼기: <b>${fmtDate(date)}부터 매주 ${DAY_NAMES[d]}요일</b> 이 수업에서 빠지고, 이후 업무일지에도 자동 반영됩니다.</p>`,
-    foot: `<button class="btn" data-close>취소</button>
-      <button class="btn" data-v="today">오늘만 제외</button>
-      <button class="btn btn-danger" data-v="tt">시간표에서 빼기</button>`,
-    onMount: (el, close) => el.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => close(b.dataset.v))),
+  const weekly = DAYS.includes(d) ? `${fmtDate(date)}부터 매주 ${DAY_NAMES[d]}요일` : '';
+  const slotOpts = slots().filter((s) => s.id !== r.slot).map((s) => `<option value="${s.id}">${esc(s.label)} ${esc(s.time || '')}</option>`).join('');
+  const res = await modal({
+    title: `${name} 수정 (${slotById(r.slot)?.label || ''})`,
+    body: `
+      <div class="edit-sec"><h4>교시 바꾸기</h4>
+        <div class="add-row wrap"><select id="er-slot">${slotOpts}</select>
+          <button class="btn" data-v="move-today">오늘만</button>
+          ${weekly ? '<button class="btn btn-primary" data-v="move-tt">시간표에 반영</button>' : ''}</div></div>
+      <div class="edit-sec"><h4>다른 학생으로 바꾸기</h4>
+        <div class="add-row wrap"><input id="er-name" list="dl-er" placeholder="학생 이름" autocomplete="off">
+          <button class="btn" data-v="swap-today">오늘만</button>
+          ${weekly ? '<button class="btn btn-primary" data-v="swap-tt">시간표에 반영</button>' : ''}</div></div>
+      <div class="edit-sec"><h4>빼기</h4>
+        <div class="add-row wrap">
+          <button class="btn" data-v="rm-today">${r.extra ? '오늘 추가 취소' : '오늘만 제외'}</button>
+          ${weekly && !r.extra ? '<button class="btn btn-danger" data-v="rm-tt">시간표에서 빼기</button>' : ''}</div></div>
+      ${r.extra && weekly ? `<div class="edit-sec"><h4>정기 수업으로</h4><div class="add-row wrap">
+          <button class="btn btn-primary" data-v="keep-tt">시간표에 추가 (${weekly})</button></div></div>` : ''}
+      <p class="subtle small">· <b>오늘만</b>: 이 날 일지에만 반영 (보강·결석·임시 변경)<br>
+        · <b>시간표에 반영</b>: ${weekly || '평일만 가능'} 수업으로 바뀌고 이후 업무일지에도 자동 반영. 지난 일지는 그대로입니다.</p>
+      <datalist id="dl-er">${activeStudents().map((s) => `<option value="${esc(s.name)}">${esc(s.grade)}</option>`).join('')}</datalist>`,
+    foot: '<button class="btn" data-close>닫기</button>',
+    onMount: (el, close) => el.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => {
+      const v = b.dataset.v;
+      const nm = el.querySelector('#er-name').value.trim();
+      if (v.startsWith('swap') && !nm) return toast('바꿀 학생 이름을 입력하세요.', 'warn');
+      close({ v, slot: el.querySelector('#er-slot').value, name: nm });
+    })),
   });
-  if (!choice) return;
-  if (choice === 'today') {
-    (log.extras ||= []).push({ slot: r.slot, item: r.item, removed: true });
+  if (!res) return;
+  const carry = log.entries[r.key];
+  const { v } = res;
+  if (v === 'rm-today') { todayRemove(r); markDirty(); return drawLog(); }
+  if (v === 'move-today') {
+    if (rows.some((x) => x.key === keyOf(res.slot, r.item))) return toast('그 교시에 이미 있습니다.', 'warn');
+    todayRemove(r); todayAdd(res.slot, r.item, carry); markDirty(); return drawLog();
+  }
+  if (v === 'swap-today') {
+    const item = await resolveStudent(res.name);
+    if (rows.some((x) => x.key === keyOf(r.slot, item))) return toast('이미 이 교시에 있는 학생입니다.', 'warn');
+    todayRemove(r); todayAdd(r.slot, item); markDirty(); return drawLog();
+  }
+  // 이하: 시간표에 반영 (이 날부터)
+  await flush();
+  if (v === 'rm-tt') {
+    await changeMyCell(r.slot, (items) => items.filter((x) => x !== r.item), `-${name}`);
+    toast(`${date}부터 시간표에서 ${name}을(를) 뺐습니다.`);
+  } else if (v === 'keep-tt') {
+    todayRemove(r);
+    await changeMyCell(r.slot, (items) => (items.includes(r.item) ? items : [...items, r.item]), `+${name}`);
+    if (carry) log.entries[r.key] = { ...carry };
+    markDirty();
+    toast(`${date}부터 시간표에 ${name}을(를) 추가했습니다.`);
+  } else if (v === 'move-tt') {
+    const to = slotById(res.slot)?.label;
+    await changeMyCells((cell) => {
+      if (!r.extra) cell(r.slot, (items) => items.filter((x) => x !== r.item));
+      cell(res.slot, (items) => (items.includes(r.item) ? items : [...items, r.item]));
+    }, `${name} ${slotById(r.slot)?.label}→${to}`);
+    if (r.extra) todayRemove(r);
+    if (carry) log.entries[keyOf(res.slot, r.item)] = { ...carry };
     delete log.entries[r.key];
     markDirty();
-    return drawLog();
+    toast(`${date}부터 ${name}의 수업을 ${to}로 옮겼습니다.`);
+  } else if (v === 'swap-tt') {
+    const item = await resolveStudent(res.name);
+    await changeMyCell(r.slot, (items) => {
+      const out = items.filter((x) => x !== item);
+      const i = out.indexOf(r.item);
+      if (i >= 0) out[i] = item; else out.push(item);
+      return out;
+    }, `${name}→${itemLabel(item)}`);
+    if (r.extra) todayRemove(r);
+    delete log.entries[r.key];
+    markDirty();
+    toast(`${date}부터 ${name} 대신 ${itemLabel(item)}(으)로 바꿨습니다.`);
   }
-  await flush();
-  await changeMyCell(r.slot, (items) => items.filter((x) => x !== r.item), `-${name}`);
-  toast(`${date}부터 시간표에서 ${name}을(를) 뺐습니다.`);
   drawLog();
 }
 
-async function addExtra() {
-  const f = await formModal('보강/추가 학생', [
+async function addExtra(presetSlot) {
+  const f = await formModal('학생 추가', [
     { name: 'name', label: '학생 이름 (또는 메모)', required: true, list: 'dl-wl-students' },
-    { name: 'slot', label: '교시', type: 'select', options: slots().map((s) => ({ value: s.id, label: `${s.label} (${s.time || ''})` })) },
+    { name: 'slot', label: '교시', type: 'select', value: presetSlot || '', options: slots().map((s) => ({ value: s.id, label: `${s.label} (${s.time || ''})` })) },
     { name: 'mode', label: '추가 방식', type: 'select', value: 'today', options: [
       { value: 'today', label: '오늘만 추가 (보강·임시)' },
       { value: 'tt', label: `시간표에 추가 — ${fmtDate(date)}부터 매주 ${DAY_NAMES[dayOfDate(date)] || ''}요일` },
     ] },
   ], { ok: '추가', extra: `<datalist id="dl-wl-students">${activeStudents().map((s) => `<option value="${esc(s.name)}">${esc(s.grade)}</option>`).join('')}</datalist>` });
   if (!f) return;
-  let s = activeStudents().find((x) => x.name === f.name);
-  if (!s && await confirmBox(`"${f.name}"은(는) 등록된 학생이 아닙니다. 신규 학생으로 등록할까요?\n(취소하면 메모 항목으로 추가합니다)`, { ok: '신규 등록' })) {
-    s = await guard(() => api.saveStudent({ name: f.name, status: 'active', enrolled_on: date }), `${f.name} 학생을 등록했습니다.`);
-    await reload();
-  }
-  const item = s ? s.id : f.name;
+  const item = await resolveStudent(f.name);
   const key = `${f.slot}|${itemKey(item)}`;
   if (rows.some((r) => r.key === key)) return toast('이미 목록에 있습니다.', 'warn');
   if (f.mode === 'tt') {

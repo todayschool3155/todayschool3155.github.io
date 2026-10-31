@@ -467,3 +467,9 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
 .rp-charts { grid-template-columns: 1fr 1fr; }
 .pick-list { display: grid; gap: 8px; }
 .pick-list .check { align-items: flex-start; }
+.wl-slot h3 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wl-slot h3 .slot-add { margin-left: auto; min-height: 28px; }
+.wl-name .row-x { margin-left: auto; width: auto; height: 28px; min-height: 28px; padding: 0 10px; font-size: 12.5px; }
+.edit-sec { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.edit-sec h4 { margin: 0 0 6px; font-size: 14px; }
+.edit-sec select, .edit-sec input { flex: 1; min-width: 140px; }

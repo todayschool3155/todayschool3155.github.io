@@ -12,15 +12,16 @@ import * as stats from './views/stats.js';
 import './studentcard.js';
 
 // bottom: 휴대폰 하단 메뉴에 표시 (나머지는 우측 상단 메뉴)
+// \uFE0E: 아이폰에서 아이콘이 컬러 이모지로 바뀌지 않고 선 모양으로 보이게
 const ROUTES = {
-  home: { label: '홈', icon: '⌂', view: home, bottom: true },
+  home: { label: '홈', icon: '⌂\uFE0E', view: home, bottom: true },
   timetable: { label: '시간표', icon: '▦', view: timetable, bottom: true },
-  worklog: { label: '업무일지', icon: '✎', view: worklog, bottom: true },
-  tests: { label: '성적', icon: '✓', view: tests, bottom: true },
-  students: { label: '학생', icon: '☺', view: students, admin: true, bottom: true },
+  worklog: { label: '업무일지', icon: '✎\uFE0E', view: worklog, bottom: true },
+  tests: { label: '성적', icon: '✓\uFE0E', view: tests, bottom: true },
+  students: { label: '학생', icon: '☺\uFE0E', view: students, admin: true, bottom: true },
   stats: { label: '통계', icon: '▤', view: stats, admin: true },
-  admin: { label: '관리', icon: '⚙', view: admin, admin: true },
-  audit: { label: '로그', icon: '☰', view: audit, admin: true },
+  admin: { label: '관리', icon: '⚙\uFE0E', view: admin, admin: true },
+  audit: { label: '로그', icon: '☰\uFE0E', view: audit, admin: true },
 };
 
 const app = $('#app');
