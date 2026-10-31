@@ -191,7 +191,7 @@ function rowHtml(r) {
     <input data-f="progress" value="${esc(e.progress)}" placeholder="${esc(hintP)}" aria-label="수업책/진도/프린트">
     <div class="hw">
       ${prevText ? `<div class="hw-prev ${e.hwDone === 'X' ? 'is-x' : ''}">
-        <span class="hw-text" title="${esc(ph?.date || '')} 숙제">전날: ${esc(prevText)}</span>
+        <span class="hw-text" title="${esc(ph?.date || '')} 숙제: ${esc(prevText)}">전날: ${esc(prevText)}</span>
         <span class="ox" role="group" aria-label="전날 숙제 완료">${['O', 'X'].map((v) =>
           `<button type="button" data-hw="${v}" class="${e.hwDone === v ? 'on ox-' + v : ''}">${v}</button>`).join('')}</span></div>` : ''}
       <input data-f="homework" value="${esc(e.homework)}" placeholder="오늘 숙제" aria-label="오늘 숙제">
