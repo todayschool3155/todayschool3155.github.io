@@ -2,13 +2,13 @@
 import { api } from '../api.js';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, versionFor, worklogRows, logRows,
-  itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts,
+  itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts, prevHomeworkMap,
 } from '../store.js';
 import { studentLink } from '../studentcard.js';
 import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js';
 import { printWorklogs } from '../print.js';
 
-let root, date, teacherId, log, rows, hints, saveState = 'idle';
+let root, date, teacherId, log, rows, hints, prevHw = {}, saveState = 'idle';
 const REVIEW_TEMPLATE = '* 수업 전반 평가:\n* 필요한 개선 사항:\n* 다음 수업 목표 또는 계획:';
 
 export async function render(el, [d, t]) {
@@ -44,8 +44,9 @@ async function load() {
   if (teacherId === 'all') return overview();
   const [logs, prev] = await Promise.all([
     guard(() => api.getWorklogs(date, date, teacherId)),
-    api.getWorklogs(addDays(date, -28), addDays(date, -1), teacherId).catch(() => []),
+    api.getWorklogs(addDays(date, -45), addDays(date, -1), teacherId).catch(() => []),
   ]);
+  prevHw = prevHomeworkMap(prev, teacherId);
   log = logs[0] || { log_date: date, teacher_id: teacherId, entries: {}, extras: [], notice: '', review: '', done: false };
   hints = {};
   for (const w of prev.sort((a, b) => a.log_date.localeCompare(b.log_date))) {
@@ -144,6 +145,7 @@ function drawLog() {
     ${!weekend && !rows.length ? '<div class="empty">이 날 시간표에 배정된 수업이 없습니다.</div>' : ''}
     <div class="wl-tools no-print">
       <button class="btn btn-sm" id="wl-allpresent">모두 출석</button>
+      <button class="btn btn-sm" id="wl-allhw">전날 숙제 모두 O</button>
       <button class="btn btn-sm btn-primary" id="wl-extra">+ 학생 추가</button>
       <span class="subtle small">학생 옆 <b>수정</b>: 교시 변경 · 다른 학생으로 바꾸기 · 빼기 (오늘만 또는 시간표에 반영)</span>
     </div>
@@ -155,7 +157,7 @@ function drawLog() {
         return `<section class="wl-slot">
           <h3>${esc(sl?.label || s)} <small>${esc(sl?.time || '')}</small>${note ? ` <small class="cell-note">${esc(note)}</small>` : ''}
             <button class="btn btn-sm slot-add no-print" data-addslot="${esc(s)}">+ 학생</button></h3>
-          <div class="wl-table-head"><span>학생</span><span>출결</span><span>수업책/진도/프린트</span><span>숙제/보충</span><span>특이사항</span></div>
+          <div class="wl-table-head"><span>학생</span><span>출결</span><span>수업책/진도/프린트</span><span>숙제 (전날 O/X · 오늘)</span><span>특이사항</span></div>
           ${bySlot[s].map(rowHtml).join('')}
         </section>`;
       }).join('')}
@@ -175,7 +177,8 @@ function rowHtml(r) {
   const s = isStudentItem(r.item) ? studentById(r.item) : null;
   const h = hints[itemKey(r.item)];
   const hintP = h?.progress ? `지난(${h.date.slice(5)}): ${h.progress}` : '수업책/진도/프린트';
-  const hintH = h?.homework ? `지난: ${h.homework}` : '숙제/보충';
+  const ph = prevHw[itemKey(r.item)];
+  const prevText = e.hwPrev || ph?.hw;
   return `<div class="wl-row ${r.orphan ? 'is-orphan' : ''} ${r.extra ? 'is-extra' : ''} ${e.att === '결석' ? 'is-absent' : ''}" data-key="${esc(r.key)}">
     <div class="wl-name">
       ${s ? `<b>${studentLink(s.id)}</b>` : `<b class="subtle">${esc(itemLabel(r.item))}</b>`}
@@ -186,7 +189,13 @@ function rowHtml(r) {
     </div>
     <div class="att" role="group" aria-label="출결">${ATT.map((a) => `<button type="button" data-att="${a}" class="${e.att === a ? 'on att-' + a : ''}">${a}</button>`).join('')}</div>
     <input data-f="progress" value="${esc(e.progress)}" placeholder="${esc(hintP)}" aria-label="수업책/진도/프린트">
-    <input data-f="homework" value="${esc(e.homework)}" placeholder="${esc(hintH)}" aria-label="숙제/보충">
+    <div class="hw">
+      ${prevText ? `<div class="hw-prev ${e.hwDone === 'X' ? 'is-x' : ''}">
+        <span class="hw-text" title="${esc(ph?.date || '')} 숙제">전날: ${esc(prevText)}</span>
+        <span class="ox" role="group" aria-label="전날 숙제 완료">${['O', 'X'].map((v) =>
+          `<button type="button" data-hw="${v}" class="${e.hwDone === v ? 'on ox-' + v : ''}">${v}</button>`).join('')}</span></div>` : ''}
+      <input data-f="homework" value="${esc(e.homework)}" placeholder="오늘 숙제" aria-label="오늘 숙제">
+    </div>
     <input data-f="note" value="${esc(e.note)}" placeholder="특이사항" aria-label="특이사항">
   </div>`;
 }
@@ -245,6 +254,17 @@ function bindLog() {
       markDirty();
     }
     if (e.target.closest('[data-editrow]')) { editRow(rows.find((r) => r.key === key)); return; }
+    const hb = e.target.closest('[data-hw]');
+    if (hb) {
+      const en = entry(key);
+      const r = rows.find((x) => x.key === key);
+      en.hwDone = en.hwDone === hb.dataset.hw ? '' : hb.dataset.hw;
+      en.hwPrev = en.hwDone ? (en.hwPrev || prevHw[itemKey(r.item)]?.hw || '') : '';
+      const wrap = hb.closest('.hw-prev');
+      wrap.querySelectorAll('[data-hw]').forEach((x) => { x.className = x.dataset.hw === en.hwDone ? `on ox-${en.hwDone}` : ''; });
+      wrap.classList.toggle('is-x', en.hwDone === 'X');
+      markDirty();
+    }
   });
   list.addEventListener('click', (e) => {
     const b = e.target.closest('[data-addslot]');
@@ -276,6 +296,20 @@ function bindLog() {
     drawLog();
   });
   root.querySelector('#wl-extra').addEventListener('click', () => addExtra());
+  root.querySelector('#wl-allhw').addEventListener('click', () => {
+    let n = 0;
+    for (const r of rows) {
+      const ph = prevHw[itemKey(r.item)];
+      const en = log.entries[r.key] || {};
+      if (r.orphan || !isStudentItem(r.item) || !(en.hwPrev || ph?.hw) || en.hwDone || en.att === '결석') continue;
+      Object.assign(entry(r.key), { hwDone: 'O', hwPrev: en.hwPrev || ph.hw });
+      n++;
+    }
+    if (!n) return toast('체크할 전날 숙제가 없습니다.', 'warn');
+    toast(`${n}명 O 처리했습니다. X인 학생만 바꿔 주세요.`);
+    markDirty();
+    drawLog();
+  });
   root.querySelectorAll('[data-undo]').forEach((b) => b.addEventListener('click', () => {
     log.extras = log.extras.filter((x) => !(x.removed && `${x.slot}|${itemKey(x.item)}` === b.dataset.undo));
     markDirty();

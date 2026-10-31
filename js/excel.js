@@ -39,7 +39,7 @@ export async function exportWorklogsXlsx(from, to) {
   const XLSX = await X();
   const logs = await api.getWorklogs(from, to);
   if (!logs.length) { toast('해당 기간의 일지가 없습니다.', 'warn'); return; }
-  const rows = [['날짜', '요일', '선생님', '교시', '학생', '학년', '출결', '수업책/진도/프린트', '숙제/보충', '특이사항']];
+  const rows = [['날짜', '요일', '선생님', '교시', '학생', '학년', '출결', '수업책/진도/프린트', '전날숙제 완료', '전날숙제', '오늘 숙제', '특이사항']];
   const notes = [['날짜', '요일', '선생님', '작성완료', '공지 및 전달사항', '하루 평가 및 총평', '최종 수정', '수정자']];
   for (const w of logs) {
     const t = teacherById(w.teacher_id)?.name || w.teacher_id;
@@ -47,14 +47,14 @@ export async function exportWorklogsXlsx(from, to) {
     for (const r of logRows(w.log_date, w.teacher_id, w)) {
       const e = w.entries[r.key] || {};
       const s = typeof r.item === 'number' ? studentById(r.item) : null;
-      rows.push([w.log_date, wd, t, slotById(r.slot)?.label || r.slot, itemLabel(r.item), s?.grade || '', e.att || '', e.progress || '', e.homework || '', e.note || '']);
+      rows.push([w.log_date, wd, t, slotById(r.slot)?.label || r.slot, itemLabel(r.item), s?.grade || '', e.att || '', e.progress || '', e.hwDone || '', e.hwPrev || '', e.homework || '', e.note || '']);
     }
     notes.push([w.log_date, wd, t, w.done ? 'O' : '', w.notice, w.review, w.updated_at, w.updated_by]);
   }
   const wb = XLSX.utils.book_new();
   const ws1 = XLSX.utils.aoa_to_sheet(rows);
-  ws1['!cols'] = [12, 5, 8, 8, 8, 6, 6, 30, 24, 24].map((wch) => ({ wch }));
-  ws1['!autofilter'] = { ref: `A1:J${rows.length}` };
+  ws1['!cols'] = [12, 5, 8, 8, 8, 6, 6, 30, 8, 24, 24, 24].map((wch) => ({ wch }));
+  ws1['!autofilter'] = { ref: `A1:L${rows.length}` };
   const ws2 = XLSX.utils.aoa_to_sheet(notes);
   ws2['!cols'] = [12, 5, 8, 8, 40, 50, 20, 10].map((wch) => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws1, '학생별 기록');

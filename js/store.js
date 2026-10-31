@@ -232,3 +232,55 @@ export function attendanceRate(s) {
   return total ? p / total : null;
 }
 export const pct = (r) => (r == null ? '—' : `${Math.round(r * 100)}%`);
+// ---------- 숙제 (전날 숙제 O/X) ----------
+// 학생의 "전날 숙제" = 같은 선생님의 바로 앞 수업 일지에 적힌 오늘 숙제(homework). 그 수업에 숙제가 없었으면 확인할 것 없음.
+// entries[key].hwDone = 'O' | 'X' (전날 숙제 완료 여부), hwPrev = 체크할 때의 전날 숙제 내용(기록용)
+
+// logs(한 선생님, date 이전) → { 's12': { hw: '익힘책 p.10', date: '2026-10-28' } }
+export function prevHomeworkMap(logs, teacherId) {
+  const last = {};
+  for (const w of [...logs].filter((x) => x.teacher_id === teacherId).sort((a, b) => a.log_date.localeCompare(b.log_date))) {
+    Object.assign(last, dayHomework(w, teacherId));
+  }
+  return last;
+}
+
+// 한 일지에서 학생별로 그날 받은 숙제 (같은 날 여러 교시면 합침, 결석한 학생은 제외 → 그 전 숙제 유지)
+function dayHomework(w, teacherId) {
+  const out = {};
+  for (const r of logRows(w.log_date, teacherId, w)) {
+    if (!isStudentItem(r.item)) continue;
+    const e = w.entries?.[r.key];
+    if (e?.att === '결석') continue;
+    const k = itemKey(r.item);
+    const prev = out[k]?.hw || '';
+    const hw = e?.homework || '';
+    out[k] = { hw: prev && hw && prev !== hw ? `${prev} / ${hw}` : prev || hw, date: w.log_date };
+  }
+  return out;
+}
+
+// 기간 [from, to] 의 숙제 확인 현황. logs 는 from 이전 기록도 포함해야 첫 수업의 전날 숙제를 알 수 있음
+// → { notDone: [{date, teacherId, sid, hw}], unchecked: [...], done: n }
+export function homeworkStatus(logs, from, to, teacherIds) {
+  const out = { notDone: [], unchecked: [], done: 0 };
+  for (const tid of teacherIds) {
+    const last = {};
+    for (const w of logs.filter((x) => x.teacher_id === tid).sort((a, b) => a.log_date.localeCompare(b.log_date))) {
+      const rows = logRows(w.log_date, tid, w).filter((r) => isStudentItem(r.item));
+      if (w.log_date >= from && w.log_date <= to) {
+        for (const r of rows) {
+          const prev = last[itemKey(r.item)];
+          const e = w.entries?.[r.key] || {};
+          if (!prev?.hw || e.att === '결석') continue;
+          const rec = { date: w.log_date, teacherId: tid, sid: r.item, hw: e.hwPrev || prev.hw };
+          if (e.hwDone === 'O') out.done++;
+          else if (e.hwDone === 'X') out.notDone.push(rec);
+          else out.unchecked.push(rec);
+        }
+      }
+      Object.assign(last, dayHomework(w, tid));
+    }
+  }
+  return out;
+}

@@ -39,6 +39,7 @@ function cardHtml(s, h, months) {
   const recs = h.records;
   const cnt = { 출석: 0, 지각: 0, 결석: 0, 보강: 0, 조퇴: 0 };
   for (const r of recs) if (r.entry.att in cnt) cnt[r.entry.att]++;
+  const hwO = recs.filter((r) => r.entry.hwDone === 'O').length, hwX = recs.filter((r) => r.entry.hwDone === 'X').length;
   const rate = attendanceRate(cnt);
   return `
     <div class="sc-head">
@@ -55,16 +56,17 @@ function cardHtml(s, h, months) {
       ${tile('결석', `${cnt.결석}회`, cnt.결석 >= 3 ? 'warn' : '')}
       ${tile('지각', `${cnt.지각}회`)}
       ${tile('보강', `${cnt.보강}회`)}
+      ${tile('숙제 완료율', hwO + hwX ? `${Math.round((hwO / (hwO + hwX)) * 100)}%` : '—', hwX >= 3 ? 'warn' : '')}
     </div>
     <h3 class="sc-h">테스트 성적</h3>
     ${testsHtml(s, h.tests)}
     <h3 class="sc-h">수업 기록 <small class="subtle">(최근 ${months}개월, 최신순)</small></h3>
     <div class="table-scroll"><table class="list compact">
-      <thead><tr><th>날짜</th><th>선생님</th><th>교시</th><th>출결</th><th>수업책/진도</th><th>숙제/보충</th><th>특이사항</th></tr></thead>
+      <thead><tr><th>날짜</th><th>선생님</th><th>교시</th><th>출결</th><th>수업책/진도</th><th>숙제 (전날 O/X · 오늘)</th><th>특이사항</th></tr></thead>
       <tbody>${recs.map((r) => `<tr class="${r.entry.att === '결석' ? 'is-warn' : ''}">
         <td class="nowrap">${fmtDate(r.log_date)}</td><td class="nowrap">${esc(teacherById(r.teacher_id)?.name || '')}</td>
         <td class="nowrap">${esc(slotById(r.key.split('|')[0])?.label || '')}</td><td>${esc(r.entry.att || '')}</td>
-        <td>${esc(r.entry.progress || '')}</td><td>${esc(r.entry.homework || '')}</td><td>${esc(r.entry.note || '')}</td></tr>`).join('')
+        <td>${esc(r.entry.progress || '')}</td><td>${r.entry.hwDone ? `<span class="badge ${r.entry.hwDone === 'X' ? 'badge-err' : 'badge-ok'}" title="${esc(r.entry.hwPrev || '')}">${esc(r.entry.hwDone)}</span> ` : ''}${esc(r.entry.homework || '')}</td><td>${esc(r.entry.note || '')}</td></tr>`).join('')
         || '<tr><td colspan="7" class="empty">기록이 없습니다.</td></tr>'}</tbody>
     </table></div>`;
 }

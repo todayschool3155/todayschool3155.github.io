@@ -1,8 +1,8 @@
-// 홈 대시보드: 오늘 수업 · 일지 미작성 알림 · 이번 달 출결 · 주의 학생 · 최근 테스트 · 최근 변경
+// 홈 대시보드: 오늘 수업 · 일지 미작성 알림 · 숙제 현황 · 이번 달 출결 · 주의 학생 · 최근 테스트 · 최근 변경
 import { api } from '../api.js';
 import {
   state, isAdmin, academyName, teacherById, studentById, slots, worklogRows, isStudentItem, holidayOf, holidays,
-  isClassDay, alertRange, trackingStart, missingLogs, alerts, attendanceStats, attendanceRate, pct, versionFor,
+  isClassDay, alertRange, trackingStart, missingLogs, homeworkStatus, alerts, attendanceStats, attendanceRate, pct, versionFor,
 } from '../store.js';
 import { esc, today, addDays, fmtDate, fmtDateTime, fmtTime, guard, DAY_NAMES, weekday } from '../util.js';
 import { studentLink } from '../studentcard.js';
@@ -31,6 +31,30 @@ export async function render(el) {
   const monthLogs = logs.filter((w) => w.log_date >= monthFrom);
   const stats = attendanceStats(monthLogs, [monthFrom, trackingStart(logs)].sort()[1], t0, tids);
   const tot = [...stats.values()].reduce((a, s) => { for (const k of ['sessions', '출석', '지각', '결석', '보강', '조퇴', 'none']) a[k] = (a[k] || 0) + s[k]; return a; }, {});
+  // 숙제 현황: 최근 7일 (전날 숙제 X = 안 함, 체크 안 함 = 미체크)
+  const hwFrom = [addDays(t0, -6), trackingStart(logs)].sort()[1];
+  const hw = homeworkStatus(logs, hwFrom, t0, tids);
+  const notDoneBy = {};
+  for (const x of hw.notDone) (notDoneBy[x.sid] ||= []).push(x);
+  const notDoneList = Object.entries(notDoneBy).sort((a, b) => b[1].length - a[1].length);
+  const uncheckedBy = {};
+  for (const x of hw.unchecked) {
+    const k = `${x.teacherId}|${x.date}`;
+    (uncheckedBy[k] ||= { ...x, n: 0 }).n++;
+  }
+  const uncheckedList = Object.values(uncheckedBy).sort((a, b) => b.date.localeCompare(a.date));
+  const hwChecked = hw.done + hw.notDone.length;
+  const hwHtml = `
+    <h3 class="sc-h">숙제 안 한 학생 <small class="subtle">${notDoneList.length}명 · ${hw.notDone.length}회</small></h3>
+    ${notDoneList.length ? `<ul class="plain-list hw-list">${notDoneList.slice(0, 15).map(([sid, xs]) => `<li>
+        ${studentLink(Number(sid))} <span class="cnt">${xs.length}회</span>
+        <span class="small subtle">${xs.map((x) => `${x.date.slice(5).replace('-', '/')} ${esc(teacherById(x.teacherId)?.name || '')} · ${esc(x.hw)}`).join(' / ')}</span></li>`).join('')}</ul>`
+      : '<p class="ok-line">✓ 숙제를 안 한 학생이 없습니다.</p>'}
+    <h3 class="sc-h">숙제 확인 안 됨 <small class="subtle">${hw.unchecked.length}명</small></h3>
+    ${uncheckedList.length ? `<ul class="plain-list hw-list">${uncheckedList.slice(0, 12).map((x) => `<li>
+        <a href="#/worklog/${x.date}/${x.teacherId}">${fmtDate(x.date)}</a>${admin ? ` <b>${esc(teacherById(x.teacherId)?.name || '')}</b>` : ''}
+        <span class="small subtle">O/X 미체크 ${x.n}명</span></li>`).join('')}</ul>`
+      : '<p class="ok-line">✓ 전날 숙제를 모두 확인했습니다.</p>'}`;
   const watch = [...stats.entries()].filter(([, s]) => s.결석 >= 3).sort((a, b) => b[1].결석 - a[1].결석);
   const todayRows = (tid) => worklogRows(t0, tid).filter((r) => isStudentItem(r.item));
   const todayPeople = tids.reduce((n, tid) => n + todayRows(tid).length, 0);
@@ -88,6 +112,7 @@ export async function render(el) {
       <div class="tile"><span>오늘 수업</span><b>${hol ? '휴원' : `${todayPeople}명`}</b><small>${DAY_NAMES[weekday(t0)] || '주말'}요일 · 연인원</small></div>
       <div class="tile ${missing.length ? 'tile-alarm' : ''}"><span>밀린 업무일지</span><b>${missing.length}건</b><small>최근 14일</small></div>
       <div class="tile"><span>이번 달 출석률</span><b>${pct(attendanceRate(tot))}</b><small>결석 ${tot.결석 || 0}회 · 미기록 ${tot.none || 0}</small></div>
+      <div class="tile ${hw.notDone.length ? 'tile-warn' : ''}"><span>숙제 안 함 (7일)</span><b>${notDoneList.length}명</b><small>완료율 ${hwChecked ? Math.round((hw.done / hwChecked) * 100) + '%' : '—'} · 미체크 ${hw.unchecked.length}</small></div>
       ${admin ? `<div class="tile ${watch.length ? 'tile-warn' : ''}"><span>주의 학생</span><b>${watch.length}명</b><small>이번 달 결석 3회+</small></div>` : ''}
     </div>
 
@@ -96,6 +121,10 @@ export async function render(el) {
       <section class="card">
         <div class="card-head"><h2>밀린 업무일지</h2>${af <= at ? `<span class="subtle small">${af.slice(5).replace('-', '/')} ~ ${at.slice(5).replace('-', '/')}</span>` : ''}</div>
         ${missHtml}
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>숙제 현황</h2>${hwFrom <= t0 ? `<span class="subtle small">${hwFrom.slice(5).replace('-', '/')} ~ ${t0.slice(5).replace('-', '/')}</span>` : ''}</div>
+        ${hwHtml}
       </section>
       ${admin ? `<section class="card">
         <div class="card-head"><h2>오늘 일지 현황</h2><a class="btn btn-sm" href="#/worklog/${t0}/all">주간 현황</a></div>

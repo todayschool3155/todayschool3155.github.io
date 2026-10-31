@@ -70,7 +70,7 @@ export function printWorklogs(pages) {
         ${i === 0 ? `<th rowspan="${g.rows.length}" class="pp-slot">${esc(slotById(g.slot)?.label || g.slot)}${note ? `<small>${esc(note)}</small>` : ''}</th>` : ''}
         <td class="pp-name">${esc(itemLabel(r.item))}${s?.grade ? `<small>${esc(s.grade)}</small>` : ''}${r.extra ? '<small>(추가)</small>' : ''}</td>
         <td class="pp-att">${esc(e.att || '')}</td>
-        <td>${esc(e.progress || '')}</td><td>${esc(e.homework || '')}</td><td>${esc(e.note || '')}</td>
+        <td>${esc(e.progress || '')}</td><td>${e.hwDone ? `<b class="pp-ox">${esc(e.hwDone)}</b> ` : ''}${esc(e.homework || '')}</td><td>${esc(e.note || '')}</td>
       </tr>`;
     }).join('')).join('');
     const present = rows.filter((r) => ['출석', '지각', '보강', '조퇴'].includes(log.entries?.[r.key]?.att)).length;
@@ -85,7 +85,7 @@ export function printWorklogs(pages) {
       </header>
       <table class="pp-table">
         <colgroup><col style="width:11%"><col style="width:12%"><col style="width:7%"><col style="width:28%"><col style="width:21%"><col style="width:21%"></colgroup>
-        <thead><tr><th>교시</th><th>학생</th><th>출결</th><th>수업책/진도/프린트</th><th>숙제/보충</th><th>특이사항</th></tr></thead>
+        <thead><tr><th>교시</th><th>학생</th><th>출결</th><th>수업책/진도/프린트</th><th>숙제 (전날 O/X · 오늘)</th><th>특이사항</th></tr></thead>
         <tbody>${body || '<tr><td colspan="6" class="pp-empty">배정된 수업 없음</td></tr>'}</tbody>
       </table>
       <div class="pp-box"><h4>공지 및 전달사항</h4><div class="pre">${esc(log.notice || '')}</div></div>
@@ -165,6 +165,8 @@ export function printMonthlyReports(reports, { notes = false } = {}) {
   const html = reports.map(({ student: s, records, stats: st, tests }) => {
     const present = st.출석 + st.지각 + st.보강 + st.조퇴;
     const rate = present + st.결석 ? Math.round((present / (present + st.결석)) * 100) + '%' : '—';
+    const hwO = records.filter((r) => r.hwDone === 'O').length, hwX = records.filter((r) => r.hwDone === 'X').length;
+    const hwRate = hwO + hwX ? Math.round((hwO / (hwO + hwX)) * 100) + '%' : '—';
     const groups = {};
     for (const t of tests) (groups[t.subject || '기타'] ||= []).push(t);
     const testBlock = Object.entries(groups).map(([subj, ts]) => {
@@ -181,13 +183,14 @@ export function printMonthlyReports(reports, { notes = false } = {}) {
         <p><b>${esc(s?.name || '')}</b> ${esc(s?.grade || '')} · ${y}년 ${Number(m)}월</p></header>
       <table class="pp-meta rp-sum"><tr>
         <th>수업</th><td>${st.sessions}회</td><th>출석</th><td>${st.출석}</td><th>지각</th><td>${st.지각}</td>
-        <th>결석</th><td>${st.결석}</td><th>보강</th><td>${st.보강}</td><th>출석률</th><td><b>${rate}</b></td></tr></table>
+        <th>결석</th><td>${st.결석}</td><th>보강</th><td>${st.보강}</td><th>출석률</th><td><b>${rate}</b></td>
+        <th>숙제</th><td><b>${hwRate}</b> <small>(O ${hwO} · X ${hwX})</small></td></tr></table>
       <h3 class="rp-h">수업 기록</h3>
       <table class="pp-table">
         <colgroup><col style="width:11%"><col style="width:10%"><col style="width:8%">${notes ? '<col style="width:29%"><col style="width:21%"><col style="width:21%">' : '<col style="width:41%"><col style="width:30%">'}</colgroup>
         <thead><tr><th>날짜</th><th>선생님</th><th>출결</th><th>수업 진도</th><th>숙제</th>${notes ? '<th>특이사항</th>' : ''}</tr></thead>
         <tbody>${records.map((r) => `<tr class="${r.att === '결석' ? 'absent' : ''}"><td>${fmtDate(r.date).slice(5)}</td><td>${esc(r.teacher.replace(/쌤$/, ''))}</td>
-          <td class="pp-att">${esc(r.att || '')}</td><td>${esc(r.progress || '')}</td><td>${esc(r.homework || '')}</td>${notes ? `<td>${esc(r.note || '')}</td>` : ''}</tr>`).join('')
+          <td class="pp-att">${esc(r.att || '')}</td><td>${esc(r.progress || '')}</td><td>${r.hwDone ? `<b class="pp-ox">전날 ${esc(r.hwDone)}</b> ` : ''}${esc(r.homework || '')}</td>${notes ? `<td>${esc(r.note || '')}</td>` : ''}</tr>`).join('')
           || `<tr><td colspan="${notes ? 6 : 5}" class="pp-empty">수업 기록 없음</td></tr>`}</tbody>
       </table>
       ${tests.length ? `<h3 class="rp-h">테스트 성적</h3>${testBlock}` : ''}

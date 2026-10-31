@@ -306,8 +306,8 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible, .cell:focus-visib
   .att { grid-column: 3 / 7; gap: 2px; }
   .att button { min-height: 32px; font-size: 12px; }
   .wl-row input { min-height: 34px; font-size: 14px; padding: 4px 8px; }
-  .wl-row input[data-f=homework] { grid-column: 1 / 4; }
-  .wl-row input[data-f=note] { grid-column: 4 / 7; }
+  .wl-row .hw { grid-column: 1 / -1; }
+  .wl-row input[data-f=note] { grid-column: 1 / -1; }
   .wl-head h2 { font-size: 17px; }
 }
 .overview td.ov { text-align: center; padding: 0; }
@@ -473,3 +473,20 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
 .edit-sec { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .edit-sec h4 { margin: 0 0 6px; font-size: 14px; }
 .edit-sec select, .edit-sec input { flex: 1; min-width: 140px; }
+
+/* 숙제: 전날 숙제 O/X + 오늘 숙제 */
+.hw { display: grid; gap: 4px; min-width: 0; }
+.hw input { width: 100%; }
+.hw-prev { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.hw-prev .hw-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hw-prev.is-x .hw-text { color: var(--danger); font-weight: 600; }
+.ox { display: inline-flex; gap: 3px; flex: none; }
+.ox button { width: 34px; height: 28px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-weight: 700; color: var(--muted); cursor: pointer; }
+.ox button.on.ox-O { background: var(--ok); border-color: var(--ok); color: #fff; }
+.ox button.on.ox-X { background: var(--danger); border-color: var(--danger); color: #fff; }
+@media (max-width: 1100px) { .wl-row .hw { grid-column: 1 / -1; } }
+.hw-list li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.hw-list .cnt { color: var(--danger); font-weight: 700; }
+.pp-ox { display: inline-block; min-width: 4mm; text-align: center; }
+.wl-tools { flex-wrap: wrap; align-items: center; }
+.wl-tools > .subtle { flex: 1 1 100%; }
