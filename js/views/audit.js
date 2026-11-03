@@ -1,6 +1,6 @@
 // 로그 기록: 로그인/시간표·학생·일지 변경 이력 조회, CSV 저장
-import { api } from '../api.js?v=202611010012';
-import { esc, $, today, addDays, fmtDateTime, guard, download } from '../util.js?v=202611010012';
+import { api } from '../api.js?v=202611032203';
+import { esc, $, today, addDays, fmtDateTime, guard, download } from '../util.js?v=202611032203';
 
 const ACTIONS = {
   login: '로그인', login_fail: '로그인 실패', logout: '로그아웃', password_change: '비밀번호 변경', password_reset: '비밀번호 초기화',

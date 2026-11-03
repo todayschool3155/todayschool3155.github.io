@@ -1,14 +1,16 @@
 // 업무일지: 날짜 + 선생님 → 시간표에서 학생 행 자동 생성, 자동 저장, A4 인쇄
-import { api } from '../api.js?v=202611010012';
+import { api } from '../api.js?v=202611032203';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, versionFor, worklogRows, logRows,
   itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts, prevHomeworkMap,
-} from '../store.js?v=202611010012';
-import { studentLink } from '../studentcard.js?v=202611010012';
-import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611010012';
-import { printWorklogs } from '../print.js?v=202611010012';
+} from '../store.js?v=202611032203';
+import { studentLink } from '../studentcard.js?v=202611032203';
+import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611032203';
+import { printWorklogs } from '../print.js?v=202611032203';
 
 let root, date, teacherId, log, rows, hints, prevHw = {}, saveState = 'idle';
+// 업무 행(보조 선생님 본인 근무) 출결: 출석 · 조퇴 · 휴가
+const WORK_ATT = ['출석', '조퇴', '휴가'];
 const REVIEW_TEMPLATE = '* 수업 전반 평가:\n* 필요한 개선 사항:\n* 다음 수업 목표 또는 계획:';
 
 export async function render(el, [d, t]) {
@@ -133,7 +135,7 @@ function drawLog() {
     <section class="wl-head">
       <div>
         <h2>${fmtDate(date)} <span class="pill" style="--tc:${esc(t?.color || '')}">${esc(t?.name || '')}</span>${t && !t.active ? ` <span class="badge badge-err">퇴사 ${esc(t.retired_on || '')}</span>` : ''}</h2>
-        <p class="subtle">${v ? `시간표 ${v.effective_from} 버전 기준` : '시간표 없음'} · 학생 ${rows.filter((r) => !r.orphan).length}명</p>
+        <p class="subtle">${v ? `시간표 ${v.effective_from} 버전 기준` : '시간표 없음'} · ${[rows.filter((r) => !r.orphan && isStudentItem(r.item)).length, rows.filter((r) => !r.orphan && itemLabel(r.item) === '업무').length].map((n, i) => (n ? (i ? `업무 ${n}건` : `학생 ${n}명`) : '')).filter(Boolean).join(' · ') || '수업 없음'}</p>
       </div>
       <div class="wl-status">
         <span id="wl-save" class="save-state"></span>
@@ -179,6 +181,16 @@ function rowHtml(r) {
   const hintP = h?.progress ? `지난(${h.date.slice(5)}): ${h.progress}` : '수업책/진도/프린트';
   const ph = prevHw[itemKey(r.item)];
   const prevText = e.hwPrev || ph?.hw;
+  // "업무" 항목(보조 선생님 업무 시간): 출결·숙제 없이 한 일만 적는 넓은 칸 (내용은 progress 칸에 저장)
+  if (itemLabel(r.item) === '업무' && !isStudentItem(r.item)) {
+    return `<div class="wl-row is-work ${r.extra ? 'is-extra' : ''} ${e.att === '휴가' ? 'is-leave' : ''}" data-key="${esc(r.key)}">
+    <div class="wl-name"><b>업무</b>${r.extra ? '<span class="badge">오늘 추가</span>' : ''}
+      ${!r.orphan ? '<button class="btn btn-sm row-x no-print" data-editrow aria-label="수정">수정</button>' : ''}</div>
+    <div class="att" role="group" aria-label="출결">${WORK_ATT.map((a) => `<button type="button" data-att="${a}" class="${e.att === a ? 'on att-' + a : ''}">${a}</button>`).join('')}</div>
+    <input data-f="progress" class="work-input" value="${esc(e.progress)}" placeholder="한 일 (예: 하루글쓰기 p1~10 스캔 및 복사)" aria-label="한 일">
+    <input data-f="note" value="${esc(e.note)}" placeholder="특이사항" aria-label="특이사항">
+  </div>`;
+  }
   return `<div class="wl-row ${r.orphan ? 'is-orphan' : ''} ${r.extra ? 'is-extra' : ''} ${e.att === '결석' ? 'is-absent' : ''}" data-key="${esc(r.key)}">
     <div class="wl-name">
       ${s ? `<b>${studentLink(s.id)}</b>` : `<b class="subtle">${esc(itemLabel(r.item))}</b>`}
@@ -251,6 +263,7 @@ function bindLog() {
       en.att = en.att === b.dataset.att ? '' : b.dataset.att;
       row.querySelectorAll('[data-att]').forEach((x) => { x.className = x.dataset.att === en.att ? `on att-${en.att}` : ''; });
       row.classList.toggle('is-absent', en.att === '결석');
+      row.classList.toggle('is-leave', en.att === '휴가');
       markDirty();
     }
     if (e.target.closest('[data-editrow]')) { editRow(rows.find((r) => r.key === key)); return; }
@@ -290,7 +303,7 @@ function bindLog() {
   root.querySelector('#wl-done').addEventListener('change', (e) => { log.done = e.target.checked; markDirty(); autosave.flush(); });
   root.querySelector('#wl-allpresent').addEventListener('click', () => {
     let n = 0;
-    for (const r of rows) if (!r.orphan && isStudentItem(r.item) && !entry(r.key).att) { entry(r.key).att = '출석'; n++; }
+    for (const r of rows) if (!r.orphan && (isStudentItem(r.item) || itemLabel(r.item) === '업무') && !entry(r.key).att) { entry(r.key).att = '출석'; n++; }
     if (!n) return toast('출결이 비어 있는 학생이 없습니다.', 'warn');
     markDirty();
     drawLog();

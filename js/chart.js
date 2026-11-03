@@ -1,5 +1,5 @@
 // 작은 SVG 꺾은선 차트 (성적 추이) — 축 1개, 얇은 선, 끝점 직접 라벨, 마우스를 올리면 값 표시
-import { esc } from './util.js?v=202611010012';
+import { esc } from './util.js?v=202611032203';
 
 // 로고 초록·주황 + 보조 남색 (색약 검증 통과 팔레트, 순서 고정)
 export const SERIES_COLORS = ['#0c8a68', '#c8690b', '#5b6bbf'];

@@ -492,3 +492,11 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
 .pp-ox { display: inline-block; min-width: 4mm; text-align: center; }
 .wl-tools { flex-wrap: wrap; align-items: center; }
 .wl-tools > .subtle { flex: 1 1 100%; }
+
+/* 업무 행 (보조 선생님): 한 일 칸을 넓게 */
+.wl-row.is-work { background: #fbf8f1; }
+.wl-row.is-work .work-input { grid-column: 3 / 5; }
+@media (max-width: 1100px) { .wl-row.is-work .work-input { grid-column: 1 / -1; } .wl-row.is-work input[data-f=note] { grid-column: 1 / -1; } }
+
+.att .att-휴가 { background: #6b7a8c; }
+.wl-row.is-leave { background: #eef1f5; }

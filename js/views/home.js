@@ -1,12 +1,12 @@
 // 홈 대시보드: 오늘 수업 · 일지 미작성 알림 · 숙제 현황 · 이번 달 출결 · 주의 학생 · 최근 테스트 · 최근 변경
-import { api } from '../api.js?v=202611010012';
+import { api } from '../api.js?v=202611032203';
 import {
   state, isAdmin, academyName, teacherById, studentById, slots, worklogRows, isStudentItem, holidayOf, holidays,
   isClassDay, alertRange, trackingStart, missingLogs, homeworkStatus, alerts, attendanceStats, attendanceRate, pct, versionFor,
-} from '../store.js?v=202611010012';
-import { esc, today, addDays, fmtDate, fmtDateTime, fmtTime, guard, DAY_NAMES, weekday } from '../util.js?v=202611010012';
-import { studentLink } from '../studentcard.js?v=202611010012';
-import { num } from '../chart.js?v=202611010012';
+} from '../store.js?v=202611032203';
+import { esc, today, addDays, fmtDate, fmtDateTime, fmtTime, guard, DAY_NAMES, weekday } from '../util.js?v=202611032203';
+import { studentLink } from '../studentcard.js?v=202611032203';
+import { num } from '../chart.js?v=202611032203';
 
 export async function render(el) {
   el.innerHTML = '<div class="loading">불러오는 중…</div>';
@@ -80,9 +80,10 @@ export async function render(el) {
 
   const mySchedule = !admin && myTid ? `<section class="card">
       <div class="card-head"><h2>오늘 내 수업</h2><a class="btn btn-sm btn-primary" href="#/worklog/${t0}/${myTid}">오늘 일지 쓰기</a></div>
-      ${hol ? `<p class="subtle">오늘은 휴원일입니다 (${esc(hol.name)}).</p>` : todayRows(myTid).length ? `<div class="today-slots">${slots().map((s) => {
-        const rs = todayRows(myTid).filter((r) => r.slot === s.id);
-        return rs.length ? `<div><b>${esc(s.label)}</b> <span class="subtle">${rs.length}명</span><div class="small">${rs.map((r) => studentLink(r.item)).join(', ')}</div></div>` : '';
+      ${hol ? `<p class="subtle">오늘은 휴원일입니다 (${esc(hol.name)}).</p>` : worklogRows(t0, myTid).length ? `<div class="today-slots">${slots().map((s) => {
+        const rs = worklogRows(t0, myTid).filter((r) => r.slot === s.id);
+        const n = rs.filter((r) => isStudentItem(r.item)).length;
+        return rs.length ? `<div><b>${esc(s.label)}</b> ${n ? `<span class="subtle">${n}명</span>` : ''}<div class="small">${rs.map((r) => (isStudentItem(r.item) ? studentLink(r.item) : esc(r.item))).join(', ')}</div></div>` : '';
       }).join('')}</div><p class="small">일지 상태: ${statusOf(myTid)}</p>` : '<p class="subtle">오늘은 시간표상 수업이 없습니다.</p>'}
     </section>` : '';
 
