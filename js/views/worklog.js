@@ -1,14 +1,15 @@
 // 업무일지: 날짜 + 선생님 → 시간표에서 학생 행 자동 생성, 자동 저장, A4 인쇄
-import { api } from '../api.js?v=202611032203';
+import { api } from '../api.js?v=202611092336';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, versionFor, worklogRows, logRows,
-  itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts, prevHomeworkMap,
-} from '../store.js?v=202611032203';
-import { studentLink } from '../studentcard.js?v=202611032203';
-import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611032203';
-import { printWorklogs } from '../print.js?v=202611032203';
+  itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts, prevHomeworkMap, refreshNotices, noticeApplies, notices as noticeCache,
+} from '../store.js?v=202611092336';
+import { studentLink } from '../studentcard.js?v=202611092336';
+import { noticeCard, ensureUsers } from './notices.js?v=202611092336';
+import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611092336';
+import { printWorklogs } from '../print.js?v=202611092336';
 
-let root, date, teacherId, log, rows, hints, prevHw = {}, saveState = 'idle';
+let root, date, teacherId, log, rows, hints, prevHw = {}, dayNotices = [], saveState = 'idle';
 // 업무 행(보조 선생님 본인 근무) 출결: 출석 · 조퇴 · 휴가
 const WORK_ATT = ['출석', '조퇴', '휴가'];
 const REVIEW_TEMPLATE = '* 수업 전반 평가:\n* 필요한 개선 사항:\n* 다음 수업 목표 또는 계획:';
@@ -20,6 +21,12 @@ export async function render(el, [d, t]) {
   else teacherId = state.user.teacher_id;
   await load();
 }
+
+window.addEventListener('notices-changed', () => {
+  if (!root?.isConnected || !location.hash.startsWith('#/worklog') || !log) return;
+  dayNotices = noticeCache.list.filter((n) => noticeApplies(n, date, teacherId));
+  drawLog();
+});
 
 export async function leave() {
   await flush();
@@ -49,6 +56,8 @@ async function load() {
     api.getWorklogs(addDays(date, -45), addDays(date, -1), teacherId).catch(() => []),
   ]);
   prevHw = prevHomeworkMap(prev, teacherId);
+  await ensureUsers();
+  dayNotices = (await refreshNotices().catch(() => [])).filter((n) => noticeApplies(n, date, teacherId));
   log = logs[0] || { log_date: date, teacher_id: teacherId, entries: {}, extras: [], notice: '', review: '', done: false };
   hints = {};
   for (const w of prev.sort((a, b) => a.log_date.localeCompare(b.log_date))) {
@@ -151,6 +160,8 @@ function drawLog() {
       <button class="btn btn-sm btn-primary" id="wl-extra">+ 학생 추가</button>
       <span class="subtle small">학생 옆 <b>수정</b>: 교시 변경 · 다른 학생으로 바꾸기 · 빼기 (오늘만 또는 시간표에 반영)</span>
     </div>
+    ${dayNotices.length ? `<section class="wl-notices"><h3>📢 이 날 공지 ${dayNotices.length}건</h3>
+      <div class="notice-list">${dayNotices.map((n) => noticeCard(n, { compact: true })).join('')}</div></section>` : ''}
     ${removedHtml()}
     <div class="wl-list">
       ${slotOrder.filter((s) => bySlot[s]).map((s) => {
@@ -158,6 +169,7 @@ function drawLog() {
         const note = v?.grid?.[dayOfDate(date)]?.[s]?.[teacherId]?.note;
         return `<section class="wl-slot">
           <h3>${esc(sl?.label || s)} <small>${esc(sl?.time || '')}</small>${note ? ` <small class="cell-note">${esc(note)}</small>` : ''}
+            ${dayNotices.filter((n) => n.slots?.includes(s)).map((n) => `<span class="slot-notice" title="${esc(n.body)}">📢 ${esc(n.title)}</span>`).join('')}
             <button class="btn btn-sm slot-add no-print" data-addslot="${esc(s)}">+ 학생</button></h3>
           <div class="wl-table-head"><span>학생</span><span>출결</span><span>수업책/진도/프린트</span><span>숙제 (전날 O/X · 오늘)</span><span>특이사항</span></div>
           ${bySlot[s].map(rowHtml).join('')}

@@ -1,5 +1,5 @@
 // 서버 통신 계층: Supabase(RPC) 또는 데모(localStorage) 백엔드
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=202611032203';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=202611092336';
 
 // 이 PC(localhost)에서 주소 뒤에 ?demo 를 붙이면 실제 서버 대신 데모 데이터로 시험 (실제 사이트에서는 무시)
 const LOCAL_DEMO = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).has('demo');
@@ -18,6 +18,8 @@ const ERRORS = {
   DUPLICATE_LOGIN: '이미 사용 중인 아이디입니다.',
   CANNOT_DEMOTE_SELF: '본인 관리자 계정은 비활성화/권한변경할 수 없습니다.',
   ONLY_OWN_CELLS: '선생님은 본인 담당 칸만 수정할 수 있습니다.',
+  TITLE_REQUIRED: '공지 제목을 입력하세요.',
+  BAD_DATES: '종료일이 시작일보다 빠릅니다.',
   HAS_RECORDS: '수업·일지·성적 기록이 있는 학생은 삭제할 수 없습니다. 퇴원 상태로 보관됩니다.',
   CANNOT_DELETE_SELF: '지금 로그인한 본인 계정은 삭제할 수 없습니다.',
 };
@@ -75,7 +77,7 @@ async function sha(s) {
 async function loadDb() {
   if (db) return db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch { db = null; }
-  if (db) { db.tests ||= []; db.seq.test ||= 1; return db; }
+  if (db) { db.tests ||= []; db.seq.test ||= 1; db.notices ||= []; db.seq.notice ||= 1; return db; }
   let seed = { teachers: [], students: [], slots: [], versions: [] };
   try {
     const r = await fetch('data/seed.json', { cache: 'no-store' });
@@ -84,7 +86,7 @@ async function loadDb() {
   const pw = await sha('today1234');
   const now = new Date().toISOString();
   db = {
-    seq: { teacher: 100, student: 1000, version: 100, user: 100, audit: 1, test: 1 },
+    seq: { teacher: 100, student: 1000, version: 100, user: 100, audit: 1, test: 1, notice: 1 },
     settings: {
       academy: { name: '오늘학원' },
       slots: seed.slots.length ? seed.slots : [
@@ -103,6 +105,7 @@ async function loadDb() {
     sessions: {},
     worklogs: {},
     tests: [],
+    notices: [],
     audit: [],
   };
   save();
@@ -318,7 +321,36 @@ const local = {
       const u = auth(true);
       audit(u.login_id, 'export');
       return { exported_at: new Date().toISOString(), settings: db.settings, teachers: db.teachers, students: db.students,
-        versions: db.versions, worklogs: Object.values(db.worklogs), tests: db.tests };
+        versions: db.versions, worklogs: Object.values(db.worklogs), tests: db.tests, notices: db.notices };
+    },
+    api_get_notices() {
+      const u = auth();
+      return db.notices.filter((n) => u.role === 'admin' || !n.targets.length || n.targets.includes(u.teacher_id))
+        .sort((a, b) => b.start_date.localeCompare(a.start_date) || b.id - a.id);
+    },
+    api_save_notice({ p }) {
+      const u = auth(true);
+      if (!(p.title || '').trim()) throw new ApiError('TITLE_REQUIRED');
+      if (p.end_date < p.start_date) throw new ApiError('BAD_DATES');
+      const now = new Date().toISOString();
+      const isNew = p.id == null;
+      const row = { important: false, targets: [], weekdays: [], slots: [], body: '', ...p, title: p.title.trim(), updated_at: now, updated_by: u.login_id };
+      const r = upsert(db.notices, isNew ? { ...row, reads: {}, created_by: u.login_id, created_at: now } : row, 'notice');
+      audit(u.login_id, isNew ? 'notice_create' : 'notice_update', r.title);
+      return r;
+    },
+    api_delete_notice({ p_id }) {
+      const u = auth(true);
+      const n = db.notices.find((x) => x.id === p_id);
+      db.notices = db.notices.filter((x) => x.id !== p_id);
+      audit(u.login_id, 'notice_delete', n?.title || '');
+    },
+    api_ack_notice({ p_id }) {
+      const u = auth();
+      const n = db.notices.find((x) => x.id === p_id && (u.role === 'admin' || !x.targets.length || x.targets.includes(u.teacher_id)));
+      if (!n) throw new ApiError('NOT_FOUND');
+      n.reads = { ...(n.reads || {}), [u.login_id]: new Date().toISOString() };
+      return n;
     },
     api_get_tests({ p_from, p_to }) {
       auth();
@@ -381,6 +413,10 @@ export const api = {
   purgeWorklogs: (before) => c('api_purge_worklogs', { p_before: before }),
   exportAll: () => c('api_export'),
   getTests: (from, to) => c('api_get_tests', { p_from: from, p_to: to }),
+  getNotices: () => c('api_get_notices'),
+  saveNotice: (p) => c('api_save_notice', { p }),
+  deleteNotice: (id) => c('api_delete_notice', { p_id: id }),
+  ackNotice: (id) => c('api_ack_notice', { p_id: id }),
   saveTest: (p) => c('api_save_test', { p }),
   deleteTest: (id) => c('api_delete_test', { p_id: id }),
   studentHistory: (sid, from, to) => c('api_student_history', { p_student: sid, p_from: from, p_to: to }),

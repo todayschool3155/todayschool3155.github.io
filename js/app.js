@@ -1,14 +1,15 @@
-import { api, DEMO, getToken } from './api.js?v=202611032203';
-import { state, reload, isAdmin, academyName, alerts, refreshAlerts } from './store.js?v=202611032203';
-import { esc, $, toast, guard, formModal, confirmBox } from './util.js?v=202611032203';
-import * as home from './views/home.js?v=202611032203';
-import * as timetable from './views/timetable.js?v=202611032203';
-import * as worklog from './views/worklog.js?v=202611032203';
-import * as students from './views/students.js?v=202611032203';
-import * as admin from './views/admin.js?v=202611032203';
-import * as audit from './views/audit.js?v=202611032203';
-import * as tests from './views/tests.js?v=202611032203';
-import * as stats from './views/stats.js?v=202611032203';
+import { api, DEMO, getToken } from './api.js?v=202611092336';
+import { state, reload, isAdmin, academyName, alerts, refreshAlerts, notices, refreshNotices, noticeState, noticeRead } from './store.js?v=202611092336';
+import { esc, $, toast, guard, formModal, confirmBox } from './util.js?v=202611092336';
+import * as home from './views/home.js?v=202611092336';
+import * as timetable from './views/timetable.js?v=202611092336';
+import * as worklog from './views/worklog.js?v=202611092336';
+import * as students from './views/students.js?v=202611092336';
+import * as admin from './views/admin.js?v=202611092336';
+import * as audit from './views/audit.js?v=202611092336';
+import * as tests from './views/tests.js?v=202611092336';
+import * as stats from './views/stats.js?v=202611092336';
+import * as noticesView from './views/notices.js?v=202611092336';
 import './studentcard.js';
 
 // bottom: 휴대폰 하단 메뉴에 표시 (나머지는 우측 상단 메뉴)
@@ -17,6 +18,7 @@ const ROUTES = {
   home: { label: '홈', icon: '⌂\uFE0E', view: home, bottom: true },
   timetable: { label: '시간표', icon: '▦', view: timetable, bottom: true },
   worklog: { label: '업무일지', icon: '✎\uFE0E', view: worklog, bottom: true },
+  notices: { label: '공지', icon: '✉\uFE0E', view: noticesView, bottom: true },
   tests: { label: '성적', icon: '✓\uFE0E', view: tests, bottom: true },
   students: { label: '학생', icon: '☺\uFE0E', view: students, admin: true, bottom: true },
   stats: { label: '통계', icon: '▤', view: stats, admin: true },
@@ -41,6 +43,23 @@ async function boot() {
   route();
   refreshAlerts(true).then(paintAlerts).catch(() => {});
   window.addEventListener('alerts-changed', paintAlerts);
+  refreshNotices(true).then(paintNotices).catch(() => {});
+  window.addEventListener('notices-changed', paintNotices);
+}
+
+// 공지: 메뉴 배지(안 읽은 진행·예정 공지) + 선생님 화면 상단 알림
+function paintNotices() {
+  const unread = isAdmin() ? [] : notices.list.filter((n) => noticeState(n) !== 'past' && !noticeRead(n));
+  document.querySelectorAll('[data-route="notices"]').forEach((a) => {
+    a.querySelector('.nbadge')?.remove();
+    if (unread.length) a.insertAdjacentHTML('beforeend', `<span class="nbadge nbadge-notice" title="확인하지 않은 공지">${unread.length}</span>`);
+  });
+  const bar = $('#notice-banner');
+  if (!bar) return;
+  const onNotices = location.hash.startsWith('#/notices');
+  bar.hidden = !unread.length || onNotices;
+  if (unread.length) bar.innerHTML = `📢 확인하지 않은 공지 <b>${unread.length}건</b>: ${esc(unread[0].title)}${unread.length > 1 ? ` 외 ${unread.length - 1}건` : ''}
+    <a href="#/notices">공지 보기</a>`;
 }
 
 // 업무일지 미작성 알림: 메뉴 배지 + (선생님) 상단 배너
@@ -107,6 +126,7 @@ function renderShell() {
       </div>
     </header>
     ${state.user.must_change ? '<div class="banner no-print">초기 비밀번호(today1234)를 사용 중입니다. <button class="linklike" data-act="pw">지금 변경하기</button></div>' : ''}
+    <div class="banner banner-notice no-print" id="notice-banner" hidden></div>
     <div class="banner banner-alarm no-print" id="alert-banner" hidden></div>
     <main id="view" class="view"></main>
     <nav class="bottomnav no-print">${nav.filter(([, r]) => r.bottom).map(([k, r]) => `<a href="#/${k}" data-route="${k}"><span class="bn-ico">${r.icon}</span>${r.label}</a>`).join('')}</nav>
@@ -162,6 +182,7 @@ async function route() {
     view.innerHTML = `<div class="empty">${esc(e.message || e)}</div>`;
   }
   if (name !== 'home') refreshAlerts().then(paintAlerts).catch(() => {});
+  refreshNotices().then(paintNotices).catch(() => {});
 }
 
 window.addEventListener('beforeunload', (e) => {

@@ -1,13 +1,13 @@
 // 시간표: 보기(요일별/선생님별/주간) + 편집(관리자: 전체 / 선생님: 본인 칸만)
-import { api } from '../api.js?v=202611032203';
+import { api } from '../api.js?v=202611092336';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, gridTeachers,
   versionFor, nextVersionAfter, cellOf, setCell, itemLabel, isStudentItem, placementsOf, placementText, DAYS,
-} from '../store.js?v=202611032203';
-import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611032203';
-import { printTimetable } from '../print.js?v=202611032203';
-import { exportTimetableXlsx } from '../excel.js?v=202611032203';
-import { studentLink } from '../studentcard.js?v=202611032203';
+} from '../store.js?v=202611092336';
+import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611092336';
+import { printTimetable } from '../print.js?v=202611092336';
+import { exportTimetableXlsx } from '../excel.js?v=202611092336';
+import { studentLink } from '../studentcard.js?v=202611092336';
 
 const pref = (k, d) => { try { return localStorage.getItem('tt_' + k) ?? d; } catch { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('tt_' + k, v); } catch {} };

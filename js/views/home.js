@@ -1,12 +1,13 @@
 // 홈 대시보드: 오늘 수업 · 일지 미작성 알림 · 숙제 현황 · 이번 달 출결 · 주의 학생 · 최근 테스트 · 최근 변경
-import { api } from '../api.js?v=202611032203';
+import { api } from '../api.js?v=202611092336';
 import {
   state, isAdmin, academyName, teacherById, studentById, slots, worklogRows, isStudentItem, holidayOf, holidays,
-  isClassDay, alertRange, trackingStart, missingLogs, homeworkStatus, alerts, attendanceStats, attendanceRate, pct, versionFor,
-} from '../store.js?v=202611032203';
-import { esc, today, addDays, fmtDate, fmtDateTime, fmtTime, guard, DAY_NAMES, weekday } from '../util.js?v=202611032203';
-import { studentLink } from '../studentcard.js?v=202611032203';
-import { num } from '../chart.js?v=202611032203';
+  isClassDay, alertRange, trackingStart, missingLogs, homeworkStatus, refreshNotices, sortNotices, noticeState, isMyNotice, noticeApplies, alerts, attendanceStats, attendanceRate, pct, versionFor,
+} from '../store.js?v=202611092336';
+import { esc, today, addDays, fmtDate, fmtDateTime, fmtTime, guard, DAY_NAMES, weekday } from '../util.js?v=202611092336';
+import { studentLink } from '../studentcard.js?v=202611092336';
+import { noticeCard, ensureUsers } from './notices.js?v=202611092336';
+import { num } from '../chart.js?v=202611092336';
 
 export async function render(el) {
   el.innerHTML = '<div class="loading">불러오는 중…</div>';
@@ -21,6 +22,7 @@ export async function render(el) {
     admin ? api.getAudit(addDays(today(), -7), today(), 300).catch(() => []) : [],
   ]);
 
+  const [nlist] = await Promise.all([refreshNotices().catch(() => []), ensureUsers()]);
   const { from: af, to: at } = alertRange(logs);
   const missing = missingLogs(logs, af, at, tids);
   alerts.missing = missing; alerts.checkedAt = Date.now();
@@ -117,6 +119,17 @@ export async function render(el) {
       ${admin ? `<div class="tile ${watch.length ? 'tile-warn' : ''}"><span>주의 학생</span><b>${watch.length}명</b><small>이번 달 결석 3회+</small></div>` : ''}
     </div>
 
+    ${(() => {
+      const live = sortNotices(nlist).filter((n) => noticeState(n) !== 'past' && isMyNotice(n));
+      const todayN = live.filter((n) => noticeApplies(n, t0, admin ? null : myTid));
+      return `<section class="card notice-home">
+        <div class="card-head"><h2>📢 공지사항 ${todayN.length ? `<small class="subtle">오늘 ${todayN.length}건</small>` : ''}</h2>
+          <a class="btn btn-sm" href="#/notices">${admin ? '공지 작성·관리' : '전체 보기'}</a></div>
+        ${live.length ? `<div class="notice-list">${live.slice(0, 4).map((n) => noticeCard(n, { compact: true })).join('')}</div>
+          ${live.length > 4 ? `<p class="small"><a href="#/notices">진행·예정 공지 ${live.length - 4}건 더 보기</a></p>` : ''}`
+          : '<p class="subtle">진행 중인 공지가 없습니다.</p>'}
+      </section>`;
+    })()}
     <div class="home-grid">
       ${mySchedule}
       <section class="card">

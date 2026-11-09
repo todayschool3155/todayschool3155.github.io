@@ -1,6 +1,6 @@
 // 로그 기록: 로그인/시간표·학생·일지 변경 이력 조회, CSV 저장
-import { api } from '../api.js?v=202611032203';
-import { esc, $, today, addDays, fmtDateTime, guard, download } from '../util.js?v=202611032203';
+import { api } from '../api.js?v=202611092336';
+import { esc, $, today, addDays, fmtDateTime, guard, download } from '../util.js?v=202611092336';
 
 const ACTIONS = {
   login: '로그인', login_fail: '로그인 실패', logout: '로그아웃', password_change: '비밀번호 변경', password_reset: '비밀번호 초기화',
@@ -10,12 +10,13 @@ const ACTIONS = {
   user_create: '계정 생성', user_update: '계정 수정', user_delete: '계정 삭제',
   settings_update: '설정 변경', worklog_save: '업무일지 저장', worklog_purge: '일지 정리(삭제)', export: '전체 백업',
   test_save: '성적 입력', test_delete: '성적 삭제',
+  notice_create: '공지 작성', notice_update: '공지 수정', notice_delete: '공지 삭제',
 };
 const GROUPS = {
-  '': '전체', auth: '로그인', timetable: '시간표', student: '학생', worklog: '업무일지', test: '성적', admin: '관리',
+  '': '전체', auth: '로그인', timetable: '시간표', student: '학생', worklog: '업무일지', test: '성적', notice: '공지', admin: '관리',
 };
 const groupOf = (a) => (a.startsWith('login') || a === 'logout' || a.startsWith('password') ? 'auth'
-  : a.startsWith('timetable') ? 'timetable' : a.startsWith('student') ? 'student' : a.startsWith('worklog') ? 'worklog' : a.startsWith('test') ? 'test' : 'admin');
+  : a.startsWith('timetable') ? 'timetable' : a.startsWith('student') ? 'student' : a.startsWith('worklog') ? 'worklog' : a.startsWith('test') ? 'test' : a.startsWith('notice') ? 'notice' : 'admin');
 
 let root, from = addDays(today(), -7), to = today(), group = '', q = '', rows = [];
 

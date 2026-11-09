@@ -12,6 +12,8 @@ const schema = fs.readFileSync(new URL('schema.sql', root), 'utf8');
 await db.exec(schema);
 await db.exec(schema); // 재실행 안전성
 await db.exec(fs.readFileSync(new URL('seed.sql', root), 'utf8'));
+// 운영 DB 처럼: 기존 스키마 위에 마이그레이션을 다시 실행해도 안전해야 함
+for (const f of fs.readdirSync(new URL('migrations/', root)).sort()) await db.exec(fs.readFileSync(new URL(`migrations/${f}`, root), 'utf8'));
 
 let failed = 0;
 const call = async (fn, args) => {
@@ -134,6 +136,32 @@ ok('no token → history blocked', (await call('api_student_history', { p_token:
   ok('student only in timetable cannot be deleted', (await call('api_delete_student', { p_token: at, p_id: 40 })).EXC === 'HAS_RECORDS');
   const fresh = await call('api_save_student', { p_token: at, p: { name: '오등록', status: 'active' } });
   ok('student without records can be deleted', !(await call('api_delete_student', { p_token: at, p_id: fresh.id }))?.EXC);
+}
+
+// 공지사항
+{
+  const tt3 = (await call('api_login', { p_login: 'su', p_password: 'today1234' })).token; // 수쌤(id 2)
+  const ta = (await call('api_login', { p_login: 'annie', p_password: 'today1234' })).token;
+  const before = (await db.query(`select count(*)::int n from worklogs`)).rows[0].n;
+  r = await call('api_save_notice', { p_token: at, p: { title: '전체 공지', body: '회의', start_date: '2026-11-09', end_date: '2026-11-09', targets: [], weekdays: [], slots: [] } });
+  ok('admin creates notice', r.id > 0, r.EXC || '');
+  const n1 = r.id;
+  r = await call('api_save_notice', { p_token: at, p: { title: '수쌤만', start_date: '2026-11-09', end_date: '2026-11-20', targets: [2], weekdays: [1, 3], slots: ['p1', 'p2'] } });
+  const n2 = r.id;
+  ok('targeted notice', r.targets.length === 1 && r.weekdays.length === 2 && r.slots.length === 2);
+  ok('teacher cannot create notice', (await call('api_save_notice', { p_token: tt3, p: { title: 'x', start_date: '2026-11-09', end_date: '2026-11-09' } })).EXC === 'FORBIDDEN');
+  ok('bad dates rejected', (await call('api_save_notice', { p_token: at, p: { title: 'x', start_date: '2026-11-10', end_date: '2026-11-09' } })).EXC === 'BAD_DATES');
+  r = await call('api_get_notices', { p_token: tt3 });
+  ok('su sees all + own', r.length === 2, r.length);
+  r = await call('api_get_notices', { p_token: ta });
+  ok('annie sees only all-target', r.length === 1 && r[0].id === n1, r.length);
+  r = await call('api_ack_notice', { p_token: tt3, p_id: n2 });
+  ok('teacher ack', r.reads && r.reads.su, JSON.stringify(r.reads || r));
+  ok('other teacher cannot ack targeted', (await call('api_ack_notice', { p_token: ta, p_id: n2 })).EXC === 'NOT_FOUND');
+  ok('export includes notices', (await call('api_export', { p_token: at })).notices.length === 2);
+  ok('teacher cannot delete notice', (await call('api_delete_notice', { p_token: tt3, p_id: n1 })).EXC === 'FORBIDDEN');
+  ok('admin deletes notice', !(await call('api_delete_notice', { p_token: at, p_id: n1 }))?.EXC);
+  ok('notices do not touch worklogs', (await db.query(`select count(*)::int n from worklogs`)).rows[0].n === before);
 }
 
 // 기타

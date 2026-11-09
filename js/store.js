@@ -1,6 +1,6 @@
 // 앱 상태 + 시간표/업무일지 도메인 로직
-import { api } from './api.js?v=202611032203';
-import { weekday, DAY_NAMES, datesBetween, today, addDays } from './util.js?v=202611032203';
+import { api } from './api.js?v=202611092336';
+import { weekday, DAY_NAMES, datesBetween, today, addDays } from './util.js?v=202611092336';
 
 export const state = {
   user: null,
@@ -284,3 +284,30 @@ export function homeworkStatus(logs, from, to, teacherIds) {
   }
   return out;
 }
+// ---------- 공지사항 ----------
+// notice = { title, body, important, targets: [선생님id]([]=전체), start_date, end_date, weekdays: [1..5]([]=매일), slots: [교시id]([]=하루 종일), reads: {아이디: 시각} }
+export const notices = { list: [], at: 0 };
+export async function refreshNotices(force = false) {
+  if (!force && Date.now() - notices.at < 30000) return notices.list;
+  notices.list = await api.getNotices();
+  notices.at = Date.now();
+  return notices.list;
+}
+// 그 날짜·선생님에게 해당하는 공지인가 (teacherId 없으면 대상 무시 = 관리자 보기)
+export function noticeApplies(n, date, teacherId) {
+  if (date < n.start_date || date > n.end_date) return false;
+  if (n.weekdays?.length && !n.weekdays.includes(dayOfDate(date))) return false;
+  if (teacherId != null && n.targets?.length && !n.targets.includes(teacherId)) return false;
+  return true;
+}
+export const noticeState = (n, d = today()) => (n.end_date < d ? 'past' : n.start_date > d ? 'soon' : 'now');
+// 오늘 기준 최신순: 진행중·예정(중요 먼저, 시작일 최신순) → 지난 공지(종료일 최신순)는 뒤로
+export function sortNotices(list, d = today()) {
+  const live = list.filter((n) => noticeState(n, d) !== 'past')
+    .sort((a, b) => (b.important - a.important) || b.start_date.localeCompare(a.start_date) || b.id - a.id);
+  const past = list.filter((n) => noticeState(n, d) === 'past')
+    .sort((a, b) => b.end_date.localeCompare(a.end_date) || b.id - a.id);
+  return [...live, ...past];
+}
+export const isMyNotice = (n) => isAdmin() || !n.targets?.length || n.targets.includes(state.user.teacher_id);
+export const noticeRead = (n) => !!n.reads?.[state.user.login_id];

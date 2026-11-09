@@ -500,3 +500,31 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
 
 .att .att-휴가 { background: #6b7a8c; }
 .wl-row.is-leave { background: #eef1f5; }
+
+/* ---------- 공지사항 ---------- */
+.notice-list { display: grid; gap: 10px; }
+.notice { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--logo-yellow); border-radius: var(--radius); padding: 12px 14px; }
+.notice.is-important { border-left-color: var(--danger); }
+.notice.is-unread { box-shadow: 0 0 0 2px var(--logo-orange); }
+.notice.st-past { opacity: .7; border-left-color: var(--line-strong); }
+.notice header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.notice h3 { font-size: 16px; margin: 0; }
+.notice-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0; color: var(--muted); }
+.notice-meta b { color: var(--text); font-weight: 600; }
+.notice-body { margin: 6px 0; line-height: 1.6; }
+.notice footer { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; margin-top: 8px; }
+.notice-home { border-top: 4px solid var(--logo-orange); }
+.wl-notices { margin-bottom: 12px; }
+.wl-notices h3 { font-size: 15px; margin: 0 0 6px; }
+.slot-notice { font-size: 12px; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 999px; padding: 1px 8px; }
+.banner-notice { background: var(--warn-soft); color: var(--text); }
+.banner-notice a { font-weight: 700; }
+.nbadge-notice { background: var(--logo-orange); }
+.nf-set { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 10px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.nf-set legend { font-weight: 700; font-size: 13.5px; padding: 0 4px; }
+.nf-opts { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+.nf-opts.is-off { opacity: .45; }
+.chipbox { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; font-size: 14px; background: var(--surface); }
+.chipbox:has(input:checked) { background: var(--green-soft); border-color: var(--brand); font-weight: 600; }
+.chipbox input { accent-color: var(--brand); }
+.notice-form #nf-preview { font-weight: 600; color: var(--brand); }

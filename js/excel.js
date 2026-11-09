@@ -1,7 +1,7 @@
 // 엑셀 내보내기 (SheetJS, 필요할 때만 CDN에서 로드)
-import { api } from './api.js?v=202611032203';
-import { state, slots, slotById, teacherById, studentById, gridTeachers, cellOf, itemLabel, logRows, DAYS, dayOfDate } from './store.js?v=202611032203';
-import { loadScript, DAY_NAMES, WEEKDAYS, weekday, toast } from './util.js?v=202611032203';
+import { api } from './api.js?v=202611092336';
+import { state, slots, slotById, teacherById, studentById, gridTeachers, cellOf, itemLabel, logRows, DAYS, dayOfDate } from './store.js?v=202611092336';
+import { loadScript, DAY_NAMES, WEEKDAYS, weekday, toast } from './util.js?v=202611092336';
 
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 async function X() { await loadScript(XLSX_URL); return window.XLSX; }
