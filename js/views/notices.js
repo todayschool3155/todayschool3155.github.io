@@ -1,9 +1,9 @@
 // 공지사항: 관리자 작성(대상·기간·요일·교시 선택) / 선생님 확인 표시. 오늘 기준 최신순, 지난 공지는 뒤로
-import { api } from '../api.js?v=202611092336';
+import { api } from '../api.js?v=202611221919';
 import {
   state, isAdmin, slots, slotById, teacherById, refreshNotices, notices as cache, noticeState, sortNotices, noticeRead, DAYS,
-} from '../store.js?v=202611092336';
-import { esc, $, today, addDays, mondayOf, fmtDateTime, toast, guard, modal, confirmBox, DAY_NAMES, WEEKDAYS, weekday, ymd } from '../util.js?v=202611092336';
+} from '../store.js?v=202611221919';
+import { esc, $, today, addDays, mondayOf, fmtDateTime, toast, guard, modal, confirmBox, DAY_NAMES, WEEKDAYS, weekday, ymd } from '../util.js?v=202611221919';
 
 let root, tab = 'live', users = [];
 

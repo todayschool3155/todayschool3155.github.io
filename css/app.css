@@ -528,3 +528,16 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
 .chipbox:has(input:checked) { background: var(--green-soft); border-color: var(--brand); font-weight: 600; }
 .chipbox input { accent-color: var(--brand); }
 .notice-form #nf-preview { font-weight: 600; color: var(--brand); }
+
+/* 교시 공통 입력 (진도·숙제 전체 적용) */
+.wl-common { display: grid; grid-template-columns: 112px 250px minmax(130px, 1.1fr) minmax(280px, 1.8fr) minmax(110px, 0.9fr);
+  gap: 8px; align-items: center; padding: 8px 12px; background: var(--green-soft); border-bottom: 1px solid var(--line); }
+.wl-common-label { display: grid; line-height: 1.2; }
+.wl-common-label small { color: var(--muted); font-size: 12px; }
+.wl-common input { width: 100%; min-height: 36px; }
+@media (max-width: 1100px) {
+  .wl-common { grid-template-columns: 1fr 1fr; }
+  .wl-common-hint { text-align: right; }
+  .wl-common input { grid-column: 1 / -1; }
+  .wl-common button { grid-column: 1 / -1; }
+}

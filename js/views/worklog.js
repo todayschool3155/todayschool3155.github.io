@@ -1,13 +1,13 @@
 // 업무일지: 날짜 + 선생님 → 시간표에서 학생 행 자동 생성, 자동 저장, A4 인쇄
-import { api } from '../api.js?v=202611092336';
+import { api } from '../api.js?v=202611221919';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, versionFor, worklogRows, logRows,
   itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts, prevHomeworkMap, refreshNotices, noticeApplies, notices as noticeCache,
-} from '../store.js?v=202611092336';
-import { studentLink } from '../studentcard.js?v=202611092336';
-import { noticeCard, ensureUsers } from './notices.js?v=202611092336';
-import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611092336';
-import { printWorklogs } from '../print.js?v=202611092336';
+} from '../store.js?v=202611221919';
+import { studentLink } from '../studentcard.js?v=202611221919';
+import { noticeCard, ensureUsers } from './notices.js?v=202611221919';
+import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611221919';
+import { printWorklogs } from '../print.js?v=202611221919';
 
 let root, date, teacherId, log, rows, hints, prevHw = {}, dayNotices = [], saveState = 'idle';
 // 업무 행(보조 선생님 본인 근무) 출결: 출석 · 조퇴 · 휴가
@@ -172,6 +172,7 @@ function drawLog() {
             ${dayNotices.filter((n) => n.slots?.includes(s)).map((n) => `<span class="slot-notice" title="${esc(n.body)}">📢 ${esc(n.title)}</span>`).join('')}
             <button class="btn btn-sm slot-add no-print" data-addslot="${esc(s)}">+ 학생</button></h3>
           <div class="wl-table-head"><span>학생</span><span>출결</span><span>수업책/진도/프린트</span><span>숙제 (전날 O/X · 오늘)</span><span>특이사항</span></div>
+          ${commonRowHtml(s, bySlot[s])}
           ${bySlot[s].map(rowHtml).join('')}
         </section>`;
       }).join('')}
@@ -184,6 +185,53 @@ function drawLog() {
   bindToolbar();
   bindLog();
   paintSave();
+}
+
+// 같은 교시 학생들의 진도·숙제가 같을 때: 한 번 적고 [전체 적용] → 그 교시 학생 모두에게 채움 (결석 학생 제외)
+const applyTargets = (slotRows) => slotRows.filter((r) => !r.orphan && isStudentItem(r.item) && (log.entries[r.key]?.att !== '결석'));
+function commonRowHtml(slot, slotRows) {
+  const n = applyTargets(slotRows).length;
+  if (n < 2) return '';
+  return `<div class="wl-common no-print" data-slot="${esc(slot)}">
+    <span class="wl-common-label"><b>공통 입력</b><small>이 교시 ${n}명</small></span>
+    <span class="wl-common-hint small subtle">한 번 적고 → 전체 적용</span>
+    <input class="cm-progress" placeholder="공통 수업책/진도/프린트" aria-label="공통 수업책/진도/프린트">
+    <input class="cm-homework" placeholder="공통 오늘 숙제" aria-label="공통 오늘 숙제">
+    <button type="button" class="btn btn-sm btn-primary" data-applyall="${esc(slot)}">전체 적용</button>
+  </div>`;
+}
+
+async function applyAll(slot, box) {
+  const vals = { progress: box.querySelector('.cm-progress').value.trim(), homework: box.querySelector('.cm-homework').value.trim() };
+  const fields = Object.keys(vals).filter((f) => vals[f]);
+  if (!fields.length) return toast('공통으로 넣을 진도나 숙제를 먼저 적어 주세요.', 'warn');
+  const targets = applyTargets(rows.filter((r) => r.slot === slot));
+  const conflicts = targets.filter((r) => fields.some((f) => (log.entries[r.key]?.[f] || '') && log.entries[r.key][f] !== vals[f]));
+  let overwrite = true;
+  if (conflicts.length) {
+    const choice = await modal({
+      title: '이미 적힌 학생이 있습니다',
+      body: `<p>${conflicts.length}명은 이미 다른 내용이 적혀 있습니다: ${conflicts.slice(0, 6).map((r) => esc(itemLabel(r.item))).join(', ')}${conflicts.length > 6 ? ' …' : ''}</p>
+        <p class="subtle small">빈 칸만 채우면 그 학생들의 기존 내용은 그대로 둡니다.</p>`,
+      foot: `<button class="btn" data-close>취소</button>
+        <button class="btn" data-v="empty">빈 칸만 채우기</button>
+        <button class="btn btn-danger" data-v="all">모두 덮어쓰기</button>`,
+      onMount: (el, close) => el.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => close(b.dataset.v))),
+    });
+    if (!choice) return;
+    overwrite = choice === 'all';
+  }
+  let n = 0;
+  for (const r of targets) {
+    const en = entry(r.key);
+    let changed = false;
+    for (const f of fields) if (overwrite || !en[f]) { if (en[f] !== vals[f]) { en[f] = vals[f]; changed = true; } }
+    if (changed) n++;
+  }
+  if (!n) return toast('바꿀 학생이 없습니다.', 'warn');
+  markDirty();
+  drawLog();
+  toast(`${slotById(slot)?.label || ''} ${n}명에게 적용했습니다.${targets.length < rows.filter((r) => r.slot === slot && isStudentItem(r.item)).length ? ' (결석 학생 제외)' : ''}`);
 }
 
 function rowHtml(r) {
@@ -294,6 +342,13 @@ function bindLog() {
   list.addEventListener('click', (e) => {
     const b = e.target.closest('[data-addslot]');
     if (b) addExtra(b.dataset.addslot);
+    const ap = e.target.closest('[data-applyall]');
+    if (ap) applyAll(ap.dataset.applyall, ap.closest('.wl-common'));
+  });
+  // 공통 입력 칸에서 Enter = 전체 적용
+  list.addEventListener('keydown', (e) => {
+    const box = e.target.closest('.wl-common');
+    if (box && e.key === 'Enter') { e.preventDefault(); applyAll(box.dataset.slot, box); }
   });
   list.addEventListener('input', (e) => {
     const f = e.target.dataset.f;
