@@ -1,13 +1,13 @@
 // 시간표: 보기(요일별/선생님별/주간) + 편집(관리자: 전체 / 선생님: 본인 칸만) + 예비 시간표(관리자 전용 초안 → 확정)
-import { api } from '../api.js?v=202611242328';
+import { api } from '../api.js?v=202611242343';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, gridTeachers,
   versionFor, nextVersionAfter, cellOf, setCell, itemLabel, isStudentItem, placementsOf, placementText, DAYS,
-} from '../store.js?v=202611242328';
-import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611242328';
-import { printTimetable } from '../print.js?v=202611242328';
-import { exportTimetableXlsx } from '../excel.js?v=202611242328';
-import { studentLink } from '../studentcard.js?v=202611242328';
+} from '../store.js?v=202611242343';
+import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611242343';
+import { printTimetable } from '../print.js?v=202611242343';
+import { exportTimetableXlsx } from '../excel.js?v=202611242343';
+import { studentLink } from '../studentcard.js?v=202611242343';
 
 const pref = (k, d) => { try { return localStorage.getItem('tt_' + k) ?? d; } catch { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('tt_' + k, v); } catch {} };
@@ -135,7 +135,7 @@ function chip(it, ctx) {
   const dup = !!(dupSet && s && ctx && dupSet.has(ctx.split('|').slice(0, 2).join('|') + '|' + it));
   if (dup) cls.push('chip-dup');
   const drag = editing && ctx && canEdit(ctx.split('|')[2]) ? `draggable="true" data-drag="${ctx}"` : '';
-  return `<span class="${cls.join(' ')}" ${drag} title="${dup ? '중복 — 같은 시간에 다른 칸에도 있음' : s?.grade ? esc(s.grade) : ''}">${esc(itemLabel(it))}${dup ? '<i class="dup-tag">중복</i>' : ''}</span>`;
+  return `<span class="${cls.join(' ')}" ${drag} title="${dup ? '중복 — 같은 시간에 다른 칸에도 있음' : s?.grade ? esc(s.grade) : ''}">${esc(itemLabel(it))}${dup ? '<i class="dup-tag">겹침</i>' : ''}</span>`;
 }
 
 // 예비 시간표 점검: 누락(현재 시간표엔 있는데 예비엔 어디에도 없는 재원생) / 중복(같은 요일·교시에 두 칸 이상)
@@ -166,8 +166,8 @@ function draftCheckHtml({ dups, missing }) {
     ${missing.length ? `<div><span class="badge badge-miss">누락 ${missing.length}명</span>
       <span class="subtle">현재 시간표에는 있는데 예비 시간표에 없음</span>
       <div class="chk-list">${missing.map((it) => `<span class="chk-item">${esc(itemLabel(it))}</span>`).join('')}</div></div>` : ''}
-    ${dups.length ? `<div><span class="badge badge-dup">중복 ${dups.length}건</span>
-      <span class="subtle">같은 시간에 두 칸 이상 (예비 시간표에서는 그대로 저장됨)</span>
+    ${dups.length ? `<div><span class="badge badge-dup">겹침(중복) ${dups.length}건</span>
+      <span class="subtle">같은 시간에 두 반 이상 겹침 (예비 시간표에서는 그대로 저장됨)</span>
       <div class="chk-list">${dups.map(({ d, s, it, ts }) => `<span class="chk-item">${DAY_NAMES[d]} ${esc(s.label)} <b>${esc(itemLabel(it))}</b>
         (${ts.map((t) => esc(teacherById(t)?.name || t)).join('·')})</span>`).join('')}</div></div>` : ''}
   </div>`;
