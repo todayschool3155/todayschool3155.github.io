@@ -1,7 +1,7 @@
 // A4 인쇄: 업무일지(일자·선생님별 1장, 세로), 시간표(주간 가로 / 요일별·선생님별 세로)
-import { state, slots, slotById, teacherById, studentById, cellOf, itemLabel, isStudentItem, logRows, versionFor, academyName, DAYS, dayOfDate } from './store.js?v=202611242343';
-import { esc, fmtDate, fmtDateTime, DAY_NAMES } from './util.js?v=202611242343';
-import { lineChart, num } from './chart.js?v=202611242343';
+import { state, slots, slotById, teacherById, studentById, cellOf, itemLabel, isStudentItem, logRows, versionFor, academyName, DAYS, dayOfDate } from './store.js?v=202611242347';
+import { esc, fmtDate, fmtDateTime, DAY_NAMES } from './util.js?v=202611242347';
+import { lineChart, num } from './chart.js?v=202611242347';
 
 function run(html, orientation) {
   const rootEl = document.getElementById('print-root');
