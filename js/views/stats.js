@@ -1,12 +1,12 @@
 // 통계 (관리자): 월별 학생 출결, 선생님별 일지 작성, 월간 리포트 인쇄
-import { api } from '../api.js?v=202611242359';
+import { api } from '../api.js?v=202611250007';
 import {
   state, studentById, teacherById, slotById, logRows, isStudentItem, isClassDay, missingLogs, trackingStart, holidayOf,
   attendanceStats, attendanceRate, pct,
-} from '../store.js?v=202611242359';
-import { esc, $, today, addDays, addMonths, datesBetween, guard, toast, formModal } from '../util.js?v=202611242359';
-import { studentLink } from '../studentcard.js?v=202611242359';
-import { printMonthlyReports } from '../print.js?v=202611242359';
+} from '../store.js?v=202611250007';
+import { esc, $, today, addDays, addMonths, datesBetween, guard, toast, formModal } from '../util.js?v=202611250007';
+import { studentLink } from '../studentcard.js?v=202611250007';
+import { printMonthlyReports } from '../print.js?v=202611250007';
 
 let root, month = today().slice(0, 7), sortKey = '결석', data = null;
 

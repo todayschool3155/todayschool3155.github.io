@@ -1,7 +1,7 @@
 // A4 인쇄: 업무일지(일자·선생님별 1장, 세로), 시간표(주간 가로 / 요일별·선생님별 세로)
-import { state, slots, slotById, teacherById, studentById, cellOf, itemLabel, isStudentItem, logRows, versionFor, academyName, DAYS, dayOfDate } from './store.js?v=202611242359';
-import { esc, fmtDate, fmtDateTime, DAY_NAMES } from './util.js?v=202611242359';
-import { lineChart, num } from './chart.js?v=202611242359';
+import { state, slots, slotById, teacherById, studentById, cellOf, itemLabel, isStudentItem, logRows, versionFor, academyName, DAYS, dayOfDate } from './store.js?v=202611250007';
+import { esc, fmtDate, fmtDateTime, DAY_NAMES } from './util.js?v=202611250007';
+import { lineChart, num } from './chart.js?v=202611250007';
 
 function run(html, orientation) {
   const rootEl = document.getElementById('print-root');
@@ -13,6 +13,7 @@ function run(html, orientation) {
   // 한 장에 맞게 축소: 시간표·업무일지 모두 A4 1장 (아주 긴 일지만 40% 밑으로는 줄이지 않음)
   const mm = rootEl.querySelector('.page')?.clientWidth / (orientation === 'landscape' ? 281 : 194) || 3.78;
   rootEl.querySelectorAll('.page').forEach((p) => {
+    if (p.classList.contains('tt-fit')) return fitTimetable(p);
     if (p.classList.contains('fit')) {
       const inner = p.firstElementChild;
       const scale = Math.min(1, p.clientHeight / inner.scrollHeight, p.clientWidth / inner.scrollWidth);
@@ -47,6 +48,31 @@ function run(html, orientation) {
   };
   window.addEventListener('afterprint', done);
   setTimeout(() => window.print(), 50);
+}
+
+// 시간표: 한 장을 꽉 채우도록 글자 크기를 가장 크게 (이름이 칸 폭을 넘지 않고, 전체가 한 장 높이 안에 들어가는 최대치)
+function fitTimetable(p) {
+  const inner = p.firstElementChild;
+  const table = inner.querySelector('.pp-tt');
+  const names = [...inner.querySelectorAll('.pp-sn')];
+  const ok = () => inner.scrollHeight <= p.clientHeight && names.every((n) => n.scrollWidth <= n.clientWidth + 0.5);
+  const set = (f) => p.style.setProperty('--ttfs', `${f}pt`);
+  let lo = 4, hi = 22;
+  set(lo);
+  if (!ok()) { // 아주 작은 글씨로도 넘치면 기존 방식처럼 통째로 축소
+    const scale = Math.min(1, p.clientHeight / inner.scrollHeight);
+    inner.style.zoom = String(Math.floor(scale * 100) / 100);
+    return;
+  }
+  while (hi - lo > 0.1) {
+    const mid = (lo + hi) / 2;
+    set(mid);
+    if (ok()) lo = mid; else hi = mid;
+  }
+  set(Math.floor(lo * 10) / 10);
+  // 남는 세로 공간은 표 높이로 채움 (칸이 고르게 늘어남)
+  const spare = p.clientHeight - inner.scrollHeight - 2;
+  if (spare > 0) table.style.height = `${table.offsetHeight + spare}px`;
 }
 
 const stamp = () => `<span class="pp-stamp">출력 ${fmtDateTime(new Date().toISOString())} · ${esc(state.user?.login_id || '')}</span>`;
@@ -104,7 +130,7 @@ function cellHtml(v, d, s, tid) {
   const c = cellOf(v.grid, d, s, tid);
   return `<td>${c.note ? `<div class="pp-note">${esc(c.note)}</div>` : ''}${c.items.map((it) => {
     const st = isStudentItem(it) ? studentById(it) : null;
-    return `<div class="${!isStudentItem(it) ? 'pp-label' : ''} ${st && st.status !== 'active' ? 'pp-out' : ''}">${esc(itemLabel(it))}</div>`;
+    return `<div class="${!isStudentItem(it) ? 'pp-label' : 'pp-sn'} ${st && st.status !== 'active' ? 'pp-out' : ''}">${esc(itemLabel(it))}</div>`;
   }).join('')}</td>`;
 }
 const slotTh = (s) => `<th class="pp-slot">${esc(s.label)}${s.time ? `<small>${esc(s.time)}</small>` : ''}</th>`;
@@ -116,7 +142,7 @@ export function printTimetable(v, mode, tids) {
     <p>적용일 ${fmtDate(v.effective_from)} ${esc(v.title || '')}</p></header>`;
   let html = '';
   if (mode === 'week') {
-    html = `<section class="page page-land fit"><div>
+    html = `<section class="page page-land tt-fit"><div>
       ${title('주간')}
       <table class="pp-tt pp-tt-week"><thead>
         <tr><th rowspan="2">교시</th>${DAYS.map((d) => `<th colspan="${ts.length}" class="pp-day">${DAY_NAMES[d]}</th>`).join('')}</tr>
@@ -126,11 +152,11 @@ export function printTimetable(v, mode, tids) {
     return run(html, 'landscape');
   }
   if (mode === 'days') {
-    html = DAYS.map((d) => `<section class="page fit"><div>${title(DAY_NAMES[d] + '요일')}
+    html = DAYS.map((d) => `<section class="page tt-fit"><div>${title(DAY_NAMES[d] + '요일')}
       <table class="pp-tt"><thead><tr><th>교시</th>${ts.map((t) => tth(t, t.name)).join('')}</tr></thead>
       <tbody>${slots().map((s) => `<tr>${slotTh(s)}${ts.map((t) => cellHtml(v, d, s.id, t.id)).join('')}</tr>`).join('')}</tbody></table>${stamp()}</div></section>`).join('');
   } else {
-    html = ts.map((t) => `<section class="page fit"><div>${title(t.name)}
+    html = ts.map((t) => `<section class="page tt-fit"><div>${title(t.name)}
       <table class="pp-tt"><thead><tr><th>교시</th>${DAYS.map((d) => tth(t, DAY_NAMES[d])).join('')}</tr></thead>
       <tbody>${slots().map((s) => `<tr>${slotTh(s)}${DAYS.map((d) => cellHtml(v, d, s.id, t.id)).join('')}</tr>`).join('')}</tbody></table>${stamp()}</div></section>`).join('');
   }

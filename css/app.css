@@ -359,12 +359,20 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
 .pp-sign td { width: 22mm; height: 12mm; }
 .pp-stamp { font-size: 7pt; color: #666; }
 .pp-tt { width: 100%; table-layout: fixed; }
-.pp-tt th, .pp-tt td { vertical-align: top; padding: 0.8mm 1mm; font-size: 9pt; }
-.pp-tt-week th, .pp-tt-week td { font-size: 7.4pt; padding: 0.4mm 0.6mm; line-height: 1.25; }
-.pp-tt-week .pp-slot { width: 12mm; }
-.pp-tt .pp-slot { width: 16mm; vertical-align: middle; }
-.pp-day { font-size: 10pt !important; background: #fff1c2 !important; border-bottom: 0.8mm solid #fcc70d !important; }
-.pp-note { font-size: 0.85em; color: #555; }
+.pp-tt th, .pp-tt td { vertical-align: top; padding: 0.6mm 0.8mm; font-size: var(--ttfs, 9pt); line-height: 1.18; }
+.pp-tt-week th, .pp-tt-week td { font-size: var(--ttfs, 7.4pt); padding: 0.2mm 0.4mm; line-height: 1.06; }
+.pp-tt-week .pp-note { font-size: 0.5em; }
+.pp-tt-week thead th { padding: 0.4mm 0.3mm; font-size: 8pt; white-space: nowrap; overflow: hidden; }
+.pp-tt-week .pp-slot { font-size: 9pt; }
+.pp-tt-week .pp-slot small { font-size: 6pt; white-space: normal; }
+.tt-fit .pp-head { margin-bottom: 1.5mm; padding-bottom: 1mm; }
+.pp-tt thead th { font-size: min(var(--ttfs, 9pt), 11pt); }
+.pp-tt-week .pp-slot { width: 11mm; }
+.pp-tt .pp-slot { width: 15mm; vertical-align: middle; font-size: min(var(--ttfs, 9pt), 11pt); }
+.pp-day { font-size: 11pt !important; background: #fff1c2 !important; border-bottom: 0.8mm solid #fcc70d !important; }
+.pp-sn { white-space: nowrap; overflow: hidden; font-weight: 600; }
+.pp-note { font-size: 0.6em; line-height: 1.1; color: #555; }
+.pp-tt .pp-label { font-size: 0.75em; line-height: 1.1; }
 .pp-label { font-style: italic; color: #444; }
 .pp-out { text-decoration: line-through; }
 .pp-memo { font-size: 8pt; margin: 2mm 0 0; }

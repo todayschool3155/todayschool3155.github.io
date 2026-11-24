@@ -1,13 +1,13 @@
 // 업무일지: 날짜 + 선생님 → 시간표에서 학생 행 자동 생성, 자동 저장, A4 인쇄
-import { api } from '../api.js?v=202611242359';
+import { api } from '../api.js?v=202611250007';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, versionFor, worklogRows, logRows,
   itemLabel, itemKey, isStudentItem, ATT, DAYS, dayOfDate, applyFromDate, cellOf, setCell, removedKeys, holidayOf, refreshAlerts, prevHomeworkMap, refreshNotices, noticeApplies, notices as noticeCache,
-} from '../store.js?v=202611242359';
-import { studentLink } from '../studentcard.js?v=202611242359';
-import { noticeCard, ensureUsers } from './notices.js?v=202611242359';
-import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611242359';
-import { printWorklogs } from '../print.js?v=202611242359';
+} from '../store.js?v=202611250007';
+import { studentLink } from '../studentcard.js?v=202611250007';
+import { noticeCard, ensureUsers } from './notices.js?v=202611250007';
+import { esc, $, today, addDays, fmtDate, fmtDateTime, fmtTime, toast, guard, modal, formModal, confirmBox, debounce, mondayOf, DAY_NAMES, datesBetween } from '../util.js?v=202611250007';
+import { printWorklogs } from '../print.js?v=202611250007';
 
 let root, date, teacherId, log, rows, hints, prevHw = {}, dayNotices = [], saveState = 'idle';
 // 업무 행(보조 선생님 본인 근무) 출결: 출석 · 조퇴 · 휴가
