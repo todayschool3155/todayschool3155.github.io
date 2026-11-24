@@ -1,13 +1,13 @@
 // 시간표: 보기(요일별/선생님별/주간) + 편집(관리자: 전체 / 선생님: 본인 칸만) + 예비 시간표(관리자 전용 초안 → 확정)
-import { api } from '../api.js?v=202611242313';
+import { api } from '../api.js?v=202611242328';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, gridTeachers,
   versionFor, nextVersionAfter, cellOf, setCell, itemLabel, isStudentItem, placementsOf, placementText, DAYS,
-} from '../store.js?v=202611242313';
-import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611242313';
-import { printTimetable } from '../print.js?v=202611242313';
-import { exportTimetableXlsx } from '../excel.js?v=202611242313';
-import { studentLink } from '../studentcard.js?v=202611242313';
+} from '../store.js?v=202611242328';
+import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611242328';
+import { printTimetable } from '../print.js?v=202611242328';
+import { exportTimetableXlsx } from '../excel.js?v=202611242328';
+import { studentLink } from '../studentcard.js?v=202611242328';
 
 const pref = (k, d) => { try { return localStorage.getItem('tt_' + k) ?? d; } catch { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('tt_' + k, v); } catch {} };
@@ -63,6 +63,8 @@ function versionRange(v) {
 function draw() {
   const v = version();
   const cur = versionFor(today());
+  const chk = draftMode && v ? draftChecks(grid()) : null;
+  dupSet = chk?.dupKeys || null;
   root.innerHTML = `
     <div class="toolbar no-print">
       <div class="tb-group">
@@ -95,7 +97,7 @@ function draw() {
         ${draftMode && !editing && v ? '<button class="btn btn-danger" id="tt-draft-confirm">예비 시간표 확정</button>' : ''}
       </div>
     </div>
-    ${draftMode ? draftInfoHtml(v) : ''}
+    ${draftMode ? draftInfoHtml(v) + (chk ? draftCheckHtml(chk) : '') : ''}
     ${v && !draftMode ? `<p class="subtle no-print">적용 기간: <b>${versionRange(v)}</b>${v.updated_by ? ` · 수정 ${fmtDateTime(v.updated_at)} ${esc(v.updated_by)}` : ''}</p>` : ''}
     ${editing ? `<div class="edit-hint no-print">
         <b>편집 모드</b> — ${isAdmin() ? '칸을 눌러' : '<b>본인 담당 칸</b>(진한 색)을 눌러'} 학생을 추가/삭제하세요.
@@ -130,8 +132,45 @@ function chip(it, ctx) {
   if (!isStudentItem(it)) cls.push('chip-label');
   if (s && s.status !== 'active') cls.push('chip-out');
   if (search && itemLabel(it).includes(search)) cls.push('chip-hit');
+  const dup = !!(dupSet && s && ctx && dupSet.has(ctx.split('|').slice(0, 2).join('|') + '|' + it));
+  if (dup) cls.push('chip-dup');
   const drag = editing && ctx && canEdit(ctx.split('|')[2]) ? `draggable="true" data-drag="${ctx}"` : '';
-  return `<span class="${cls.join(' ')}" ${drag} title="${s?.grade ? esc(s.grade) : ''}">${esc(itemLabel(it))}</span>`;
+  return `<span class="${cls.join(' ')}" ${drag} title="${dup ? '중복 — 같은 시간에 다른 칸에도 있음' : s?.grade ? esc(s.grade) : ''}">${esc(itemLabel(it))}${dup ? '<i class="dup-tag">중복</i>' : ''}</span>`;
+}
+
+// 예비 시간표 점검: 누락(현재 시간표엔 있는데 예비엔 어디에도 없는 재원생) / 중복(같은 요일·교시에 두 칸 이상)
+let dupSet = null;
+function draftChecks(g) {
+  const base = baseGrid();
+  const inDraft = new Set(), inBase = new Set(), dups = [], dupKeys = new Set();
+  for (const d of DAYS) for (const s of slots()) {
+    const seen = new Map();
+    for (const [tid, c] of Object.entries(g[d]?.[s.id] || {})) {
+      for (const it of c.items || []) {
+        if (!isStudentItem(it)) continue;
+        inDraft.add(it);
+        seen.set(it, [...(seen.get(it) || []), Number(tid)]);
+      }
+    }
+    for (const [it, ts] of seen) if (ts.length > 1) { dups.push({ d, s, it, ts }); dupKeys.add(`${d}|${s.id}|${it}`); }
+    for (const c of Object.values(base[d]?.[s.id] || {})) for (const it of c.items || []) if (isStudentItem(it)) inBase.add(it);
+  }
+  const missing = [...inBase].filter((it) => !inDraft.has(it) && studentById(it)?.status === 'active')
+    .sort((a, b) => itemLabel(a).localeCompare(itemLabel(b), 'ko'));
+  return { dups, dupKeys, missing };
+}
+
+function draftCheckHtml({ dups, missing }) {
+  if (!dups.length && !missing.length) return '<div class="draft-check ok no-print">누락·중복 없음</div>';
+  return `<div class="draft-check no-print">
+    ${missing.length ? `<div><span class="badge badge-miss">누락 ${missing.length}명</span>
+      <span class="subtle">현재 시간표에는 있는데 예비 시간표에 없음</span>
+      <div class="chk-list">${missing.map((it) => `<span class="chk-item">${esc(itemLabel(it))}</span>`).join('')}</div></div>` : ''}
+    ${dups.length ? `<div><span class="badge badge-dup">중복 ${dups.length}건</span>
+      <span class="subtle">같은 시간에 두 칸 이상 (예비 시간표에서는 그대로 저장됨)</span>
+      <div class="chk-list">${dups.map(({ d, s, it, ts }) => `<span class="chk-item">${DAY_NAMES[d]} ${esc(s.label)} <b>${esc(itemLabel(it))}</b>
+        (${ts.map((t) => esc(teacherById(t)?.name || t)).join('·')})</span>`).join('')}</div></div>` : ''}
+  </div>`;
 }
 
 function cellHtml(d, slotId, t, dayStart = false) {
