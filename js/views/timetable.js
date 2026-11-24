@@ -1,18 +1,20 @@
-// 시간표: 보기(요일별/선생님별/주간) + 편집(관리자: 전체 / 선생님: 본인 칸만)
-import { api } from '../api.js?v=202611221919';
+// 시간표: 보기(요일별/선생님별/주간) + 편집(관리자: 전체 / 선생님: 본인 칸만) + 예비 시간표(관리자 전용 초안 → 확정)
+import { api } from '../api.js?v=202611242313';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, gridTeachers,
   versionFor, nextVersionAfter, cellOf, setCell, itemLabel, isStudentItem, placementsOf, placementText, DAYS,
-} from '../store.js?v=202611221919';
-import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611221919';
-import { printTimetable } from '../print.js?v=202611221919';
-import { exportTimetableXlsx } from '../excel.js?v=202611221919';
-import { studentLink } from '../studentcard.js?v=202611221919';
+} from '../store.js?v=202611242313';
+import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611242313';
+import { printTimetable } from '../print.js?v=202611242313';
+import { exportTimetableXlsx } from '../excel.js?v=202611242313';
+import { studentLink } from '../studentcard.js?v=202611242313';
 
 const pref = (k, d) => { try { return localStorage.getItem('tt_' + k) ?? d; } catch { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('tt_' + k, v); } catch {} };
 
 let root, versionId, mode, day, teacherSel, search = '', editing = false, work = null, changes = [];
+// 예비 시간표: 관리자만 보는 초안 (서버 timetable_drafts). draftMode 이면 화면의 "버전" 자리에 초안이 들어감
+let draftMode = false, drafts = [], draftId = null;
 
 export async function render(el) {
   root = el;
@@ -22,7 +24,7 @@ export async function render(el) {
   day = DAYS.includes(wd) ? wd : 1;
   mode = pref('mode', matchMedia('(max-width: 900px)').matches ? 'day' : 'week');
   teacherSel = Number(pref('teacher', state.user.teacher_id || state.teachers[0]?.id || 0));
-  editing = false; work = null; changes = [];
+  editing = false; work = null; changes = []; draftMode = false;
   draw();
 }
 
@@ -35,7 +37,11 @@ export async function leave() {
   return true;
 }
 
-const version = () => state.versions.find((v) => v.id === versionId) || null;
+const draftRow = () => drafts.find((d) => d.id === draftId) || null;
+// 초안을 버전처럼 다루기 위한 모양 (적용일은 표시용으로 오늘)
+const draftView = () => { const d = draftRow(); return d ? { ...d, effective_from: today(), isDraft: true } : null; };
+const version = () => (draftMode ? draftView() : state.versions.find((v) => v.id === versionId) || null);
+const baseGrid = () => versionFor(today())?.grid || {};
 const canEditTimetable = () => isAdmin() || !!state.user.teacher_id;
 const canEdit = (tid) => isAdmin() || state.user.teacher_id === Number(tid);
 const grid = () => (editing ? work.grid : version()?.grid) || {};
@@ -60,11 +66,16 @@ function draw() {
   root.innerHTML = `
     <div class="toolbar no-print">
       <div class="tb-group">
-        <select id="tt-version" aria-label="시간표 버전" ${editing ? 'disabled' : ''}>
+        ${draftMode ? `<select id="tt-draft" aria-label="예비 시간표" ${editing ? 'disabled' : ''}>
+            ${drafts.map((d) => `<option value="${d.id}" ${d.id === draftId ? 'selected' : ''}>${esc(d.title || '예비 시간표')}${d.confirmed_from ? ` (확정 ${d.confirmed_from.slice(5)})` : ''}</option>`).join('') || '<option>예비 시간표 없음</option>'}
+          </select>
+          ${!editing ? `<button class="btn btn-sm" id="tt-draft-new">+ 새 예비 시간표</button>
+            ${v ? '<button class="btn btn-sm" id="tt-draft-rename">이름 변경</button><button class="btn btn-sm btn-danger" id="tt-draft-del">삭제</button>' : ''}` : ''}
+        ` : `<select id="tt-version" aria-label="시간표 버전" ${editing ? 'disabled' : ''}>
           ${[...state.versions].reverse().map((x) => `<option value="${x.id}" ${x.id === versionId ? 'selected' : ''}>
             ${x.effective_from}${x === cur ? ' (현재)' : x.effective_from > today() ? ' (예정)' : ''} ${esc(x.title || '')}</option>`).join('')}
           ${state.versions.length ? '' : '<option>시간표 없음</option>'}
-        </select>
+        </select>`}
         <div class="seg" role="tablist">
           ${[['day', '요일별'], ['teacher', '선생님별'], ['week', '주간 전체']].map(([k, l]) =>
             `<button role="tab" data-mode="${k}" class="${mode === k ? 'on' : ''}">${l}</button>`).join('')}
@@ -74,13 +85,18 @@ function draw() {
         <input type="search" id="tt-search" placeholder="학생 이름 검색" value="${esc(search)}" list="dl-students">
         <button class="btn" id="tt-print">인쇄</button>
         ${isAdmin() ? `<button class="btn" id="tt-xlsx">엑셀</button>` : ''}
+        ${isAdmin() && !editing ? `<div class="seg tt-modes" role="tablist" aria-label="시간표 종류">
+          <button role="tab" data-ttmode="current" class="${draftMode ? '' : 'on'}">현재 시간표</button>
+          <button role="tab" data-ttmode="draft" class="${draftMode ? 'on' : ''}">예비 시간표</button></div>` : ''}
         ${canEditTimetable() ? (editing
           ? '<button class="btn btn-primary" id="tt-edit-done">편집 종료</button>'
           : `<button class="btn btn-primary" id="tt-edit" ${v ? '' : 'disabled'}>${isAdmin() ? '편집' : '내 수업 편집'}</button>`) : ''}
-        ${isAdmin() && !editing ? '<button class="btn" id="tt-versions">버전 관리</button>' : ''}
+        ${isAdmin() && !editing && !draftMode ? '<button class="btn" id="tt-versions">버전 관리</button>' : ''}
+        ${draftMode && !editing && v ? '<button class="btn btn-danger" id="tt-draft-confirm">예비 시간표 확정</button>' : ''}
       </div>
     </div>
-    ${v ? `<p class="subtle no-print">적용 기간: <b>${versionRange(v)}</b>${v.updated_by ? ` · 수정 ${fmtDateTime(v.updated_at)} ${esc(v.updated_by)}` : ''}</p>` : ''}
+    ${draftMode ? draftInfoHtml(v) : ''}
+    ${v && !draftMode ? `<p class="subtle no-print">적용 기간: <b>${versionRange(v)}</b>${v.updated_by ? ` · 수정 ${fmtDateTime(v.updated_at)} ${esc(v.updated_by)}` : ''}</p>` : ''}
     ${editing ? `<div class="edit-hint no-print">
         <b>편집 모드</b> — ${isAdmin() ? '칸을 눌러' : '<b>본인 담당 칸</b>(진한 색)을 눌러'} 학생을 추가/삭제하세요.
         PC에서는 이름을 끌어 다른 칸으로 옮길 수 있습니다 (Ctrl 누르고 끌면 복사).
@@ -90,13 +106,13 @@ function draw() {
     ${mode === 'teacher' ? `<div class="daytabs no-print">${gridTeachers(v).map((t) =>
       `<button data-teacher="${t.id}" class="${t.id === teacherSel ? 'on' : ''}" style="--tc:${esc(t.color)}">${esc(t.name)}</button>`).join('')}</div>` : ''}
     <div id="tt-found" class="found no-print"></div>
-    <div class="grid-wrap">${v ? gridHtml() : emptyHtml()}</div>
+    <div class="grid-wrap">${v ? gridHtml() : draftMode ? '<div class="empty">예비 시간표가 없습니다.<br><button class="btn btn-primary" id="tt-draft-new2">현재 시간표로 예비 시간표 만들기</button></div>' : emptyHtml()}</div>
     ${v?.memo ? `<p class="memo pre">${esc(v.memo)}</p>` : ''}
     <div class="savebar no-print" id="tt-savebar" hidden>
       <span id="tt-changes"></span>
       <button class="btn" id="tt-cancel">변경 취소</button>
-      ${isAdmin() ? '<button class="btn" id="tt-save-new">새 적용일로 저장</button>' : ''}
-      <button class="btn btn-primary" id="tt-save">이 버전에 저장</button>
+      ${isAdmin() && !draftMode ? '<button class="btn" id="tt-save-new">새 적용일로 저장</button>' : ''}
+      <button class="btn btn-primary" id="tt-save">${draftMode ? '예비 시간표에 저장' : '이 버전에 저장'}</button>
     </div>
     <datalist id="dl-students">${activeStudents().map((s) => `<option value="${esc(s.name)}">`).join('')}</datalist>`;
   bind();
@@ -123,12 +139,27 @@ function cellHtml(d, slotId, t, dayStart = false) {
   const ctx = (i) => `${d}|${slotId}|${t.id}|${i}`;
   const mine = state.user.teacher_id === t.id;
   const ed = editing && canEdit(t.id);
-  return `<td class="cell ${ed ? 'editable' : ''} ${editing && !ed ? 'locked' : ''} ${mine ? 'mine' : ''} ${dayStart ? 'day-start' : ''}" style="--tc:${esc(t.color)}"
+  const diff = draftMode && cellKey(c) !== cellKey(cellOf(baseGrid(), d, slotId, t.id));
+  return `<td class="cell ${ed ? 'editable' : ''} ${editing && !ed ? 'locked' : ''} ${mine ? 'mine' : ''} ${dayStart ? 'day-start' : ''} ${diff ? 'cell-diff' : ''}" style="--tc:${esc(t.color)}"
       data-cell="${d}|${slotId}|${t.id}" ${ed ? 'tabindex="0"' : ''}>
     ${c.note ? `<div class="cell-note">${esc(c.note)}</div>` : ''}
     <div class="chips">${c.items.map((it, i) => chip(it, ctx(i))).join('')}</div>
     ${ed ? `<span class="cell-count">${c.items.length || '+'}</span>` : ''}
   </td>`;
+}
+
+const cellKey = (c) => JSON.stringify([c.items, c.note || '']);
+
+function draftInfoHtml(v) {
+  if (!v) return `<div class="draft-info no-print"><b>예비 시간표</b> — 현재 시간표를 복사해 미리 바꿔 볼 수 있습니다. <b>선생님들에게는 보이지 않습니다.</b></div>`;
+  const n = diffGrids(baseGrid(), (editing ? work : v).grid).length;
+  const base = state.versions.find((x) => x.id === v.base_version_id);
+  return `<div class="draft-info no-print">
+    <b>예비 시간표</b> · 선생님들에게는 보이지 않음 · 기준: ${base ? `${esc(base.effective_from)} 시간표` : '현재 시간표'}
+    · <span class="${n ? 'diff-count' : ''}">현재 시간표와 다른 칸 <b>${n}</b>개</span>${n ? ' (노란 테두리)' : ''}
+    · 수정 ${fmtDateTime(v.updated_at)} ${esc(v.updated_by)}
+    ${v.confirmed_from ? ` · <span class="badge badge-ok">확정됨: ${esc(v.confirmed_from)}부터 적용</span>` : ''}
+  </div>`;
 }
 
 function slotTh(s) {
@@ -171,6 +202,13 @@ function showFound() {
 
 function bind() {
   root.querySelector('#tt-version')?.addEventListener('change', (e) => { versionId = Number(e.target.value); draw(); });
+  root.querySelector('#tt-draft')?.addEventListener('change', (e) => { draftId = Number(e.target.value); draw(); });
+  root.querySelectorAll('[data-ttmode]').forEach((b) => b.addEventListener('click', () => switchMode(b.dataset.ttmode === 'draft')));
+  root.querySelector('#tt-draft-new')?.addEventListener('click', newDraft);
+  root.querySelector('#tt-draft-new2')?.addEventListener('click', newDraft);
+  root.querySelector('#tt-draft-rename')?.addEventListener('click', renameDraft);
+  root.querySelector('#tt-draft-del')?.addEventListener('click', deleteDraft);
+  root.querySelector('#tt-draft-confirm')?.addEventListener('click', confirmDraft);
   root.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; setPref('mode', mode); draw(); }));
   root.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { day = Number(b.dataset.day); draw(); }));
   root.querySelectorAll('[data-teacher]').forEach((b) => b.addEventListener('click', () => { teacherSel = Number(b.dataset.teacher); setPref('teacher', teacherSel); draw(); }));
@@ -448,6 +486,12 @@ function diffGrids(a, b) {
 }
 
 async function saveHere() {
+  if (draftMode) {
+    const saved = await guard(() => api.saveDraft({ id: work.id, title: work.title, memo: work.memo, grid: work.grid, changes }), '예비 시간표에 저장했습니다.');
+    drafts = drafts.map((d) => (d.id === saved.id ? saved : d));
+    editing = false; work = null; changes = []; window.__dirty = false;
+    return draw();
+  }
   const v = version();
   const nx = nextVersionAfter(v);
   const later = state.versions.filter((x) => x.effective_from > v.effective_from);
@@ -576,4 +620,104 @@ async function printDialog() {
   ], { ok: '인쇄' });
   if (!f) return;
   printTimetable(v, f.mode, f.teacher ? [Number(f.teacher)] : ts.map((t) => t.id));
+}
+
+// ---------- 예비 시간표 (관리자 전용) ----------
+async function loadDrafts() {
+  drafts = await guard(() => api.getDrafts());
+  if (!drafts.some((d) => d.id === draftId)) draftId = drafts[0]?.id ?? null;
+}
+
+async function switchMode(toDraft) {
+  if (toDraft === draftMode) return;
+  if (toDraft) await loadDrafts();
+  draftMode = toDraft;
+  if (!toDraft) versionId = versionFor(today())?.id ?? versionId;
+  draw();
+}
+
+// 현재(오늘 적용 중인) 시간표를 그대로 복사해 새 초안 만들기
+async function newDraft() {
+  const base = versionFor(today());
+  if (!base) return toast('먼저 시간표를 만들어 주세요.', 'err');
+  const m = Number(today().slice(5, 7));
+  const f = await formModal('새 예비 시간표', [
+    { name: 'title', label: '이름', value: `${m === 12 ? 1 : m + 1}월 예비 시간표`, required: true },
+  ], { ok: '만들기', extra: `<p class="subtle small">현재 시간표(${esc(base.effective_from)} ${esc(base.title || '')})를 그대로 복사해 시작합니다. 선생님들에게는 보이지 않습니다.</p>` });
+  if (!f) return;
+  const d = await guard(() => api.saveDraft({ title: f.title, memo: base.memo || '', grid: base.grid, base_version_id: base.id }), '예비 시간표를 만들었습니다.');
+  await loadDrafts();
+  draftId = d.id;
+  draw();
+}
+
+async function renameDraft() {
+  const d = draftRow();
+  const f = await formModal('예비 시간표 이름 변경', [{ name: 'title', label: '이름', value: d.title, required: true }]);
+  if (!f) return;
+  const saved = await guard(() => api.saveDraft({ id: d.id, title: f.title, memo: d.memo, grid: d.grid }));
+  drafts = drafts.map((x) => (x.id === saved.id ? saved : x));
+  draw();
+}
+
+async function deleteDraft() {
+  const d = draftRow();
+  if (!(await confirmBox(`예비 시간표 "${d.title}"를 삭제할까요?\n현재 시간표와 업무일지에는 영향이 없습니다.`, { ok: '삭제', danger: true }))) return;
+  await guard(() => api.deleteDraft(d.id), '삭제했습니다.');
+  await loadDrafts();
+  draw();
+}
+
+const diffText = (x) => `${place(x.d, x.s, x.t)}: ${[...x.add.map((i) => '+' + itemLabel(i)), ...x.rm.map((i) => '-' + itemLabel(i)), ...(x.note !== null ? ['메모 변경'] : [])].join(' ')}`;
+
+// 확정: 적용 시작일부터 예비 시간표가 실제 시간표가 됨 (그날부터 업무일지 자동 배정, 그 전 일지는 그대로)
+async function confirmDraft() {
+  const d = draftRow();
+  const base = versionFor(today());
+  const diffs = diffGrids(base?.grid || {}, d.grid);
+  const res = await modal({
+    title: `"${d.title}" 확정`,
+    wide: true,
+    body: `
+      <div class="field"><label for="cf-date">적용 시작일</label><input type="date" id="cf-date" value="${today()}">
+        <small class="hint">이 날짜부터 예비 시간표가 <b>실제 시간표</b>가 되고, 그날부터의 <b>선생님 업무일지가 자동으로</b> 새 시간표대로 배정됩니다. 그 전 날짜의 시간표·업무일지는 그대로입니다.</small></div>
+      <div id="cf-warn"></div>
+      <h4 class="sc-h">현재 시간표와 다른 칸 ${diffs.length}개</h4>
+      ${diffs.length ? `<pre class="pre small cf-list">${esc(diffs.slice(0, 40).map(diffText).join('\n'))}${diffs.length > 40 ? `\n… 외 ${diffs.length - 40}칸` : ''}</pre>`
+        : '<p class="subtle">현재 시간표와 같습니다.</p>'}`,
+    foot: '<button class="btn" data-close>취소</button><button class="btn btn-danger" id="cf-ok">확정</button>',
+    onMount: (el, close) => {
+      const warn = () => {
+        const date = el.querySelector('#cf-date').value;
+        const same = state.versions.find((x) => x.effective_from === date);
+        const later = state.versions.filter((x) => x.effective_from > date);
+        el.querySelector('#cf-warn').innerHTML = [
+          date < today() ? '<p class="alert-box">⚠ 지난 날짜입니다. 그날 이후 이미 쓴 업무일지의 학생 명단도 새 시간표 기준으로 바뀝니다 (적어 둔 기록은 지워지지 않고 "시간표 외"로 남습니다).</p>' : '',
+          same ? `<p class="alert-box">이 날짜에 이미 시간표(${esc(same.title || same.effective_from)})가 있어, 그 내용을 예비 시간표로 <b>바꿉니다</b>.</p>` : '',
+          later.length ? `<p class="alert-box">이 날짜 뒤에 적용될 시간표가 ${later.length}개 있습니다 (${later.map((x) => esc(x.effective_from)).join(', ')}). 그 날짜부터는 그 시간표가 다시 적용됩니다.</p>` : '',
+        ].join('');
+      };
+      el.querySelector('#cf-date').addEventListener('change', warn);
+      warn();
+      el.querySelector('#cf-ok').addEventListener('click', () => {
+        const date = el.querySelector('#cf-date').value;
+        if (!date) return toast('적용 시작일을 고르세요.', 'err');
+        close({ date });
+      });
+    },
+  });
+  if (!res) return;
+  const { date } = res;
+  const changesTxt = [`예비 시간표 "${d.title}" 확정 (${date}부터)`, ...diffs.slice(0, 60).map(diffText)];
+  const same = state.versions.find((x) => x.effective_from === date);
+  await guard(async () => {
+    if (same) await api.saveVersion({ ...same, grid: d.grid, changes: changesTxt });
+    else await api.saveVersion({ effective_from: date, title: `예비 확정: ${d.title}`, memo: d.memo || base?.memo || '', grid: d.grid, changes: changesTxt });
+    const saved = await api.saveDraft({ id: d.id, title: d.title, memo: d.memo, grid: d.grid, confirm: true, confirmed_from: date });
+    drafts = drafts.map((x) => (x.id === saved.id ? saved : x));
+  }, `확정했습니다. ${date}부터 시간표와 업무일지에 반영됩니다.`);
+  await reload();
+  draftMode = false;
+  versionId = state.versions.find((x) => x.effective_from === date)?.id ?? versionFor(today())?.id;
+  draw();
 }

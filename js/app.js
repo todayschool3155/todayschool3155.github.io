@@ -1,15 +1,15 @@
-import { api, DEMO, getToken } from './api.js?v=202611221919';
-import { state, reload, isAdmin, academyName, alerts, refreshAlerts, notices, refreshNotices, noticeState, noticeRead } from './store.js?v=202611221919';
-import { esc, $, toast, guard, formModal, confirmBox } from './util.js?v=202611221919';
-import * as home from './views/home.js?v=202611221919';
-import * as timetable from './views/timetable.js?v=202611221919';
-import * as worklog from './views/worklog.js?v=202611221919';
-import * as students from './views/students.js?v=202611221919';
-import * as admin from './views/admin.js?v=202611221919';
-import * as audit from './views/audit.js?v=202611221919';
-import * as tests from './views/tests.js?v=202611221919';
-import * as stats from './views/stats.js?v=202611221919';
-import * as noticesView from './views/notices.js?v=202611221919';
+import { api, DEMO, getToken } from './api.js?v=202611242313';
+import { state, reload, isAdmin, academyName, alerts, refreshAlerts, notices, refreshNotices, noticeState, noticeRead } from './store.js?v=202611242313';
+import { esc, $, toast, guard, formModal, confirmBox } from './util.js?v=202611242313';
+import * as home from './views/home.js?v=202611242313';
+import * as timetable from './views/timetable.js?v=202611242313';
+import * as worklog from './views/worklog.js?v=202611242313';
+import * as students from './views/students.js?v=202611242313';
+import * as admin from './views/admin.js?v=202611242313';
+import * as audit from './views/audit.js?v=202611242313';
+import * as tests from './views/tests.js?v=202611242313';
+import * as stats from './views/stats.js?v=202611242313';
+import * as noticesView from './views/notices.js?v=202611242313';
 import './studentcard.js';
 
 // bottom: 휴대폰 하단 메뉴에 표시 (나머지는 우측 상단 메뉴)

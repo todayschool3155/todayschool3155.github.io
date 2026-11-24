@@ -1,5 +1,5 @@
 // 서버 통신 계층: Supabase(RPC) 또는 데모(localStorage) 백엔드
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=202611221919';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js?v=202611242313';
 
 // 이 PC(localhost)에서 주소 뒤에 ?demo 를 붙이면 실제 서버 대신 데모 데이터로 시험 (실제 사이트에서는 무시)
 const LOCAL_DEMO = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).has('demo');
@@ -77,7 +77,7 @@ async function sha(s) {
 async function loadDb() {
   if (db) return db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch { db = null; }
-  if (db) { db.tests ||= []; db.seq.test ||= 1; db.notices ||= []; db.seq.notice ||= 1; return db; }
+  if (db) { db.tests ||= []; db.seq.test ||= 1; db.notices ||= []; db.seq.notice ||= 1; db.drafts ||= []; db.seq.draft ||= 1; return db; }
   let seed = { teachers: [], students: [], slots: [], versions: [] };
   try {
     const r = await fetch('data/seed.json', { cache: 'no-store' });
@@ -86,7 +86,7 @@ async function loadDb() {
   const pw = await sha('today1234');
   const now = new Date().toISOString();
   db = {
-    seq: { teacher: 100, student: 1000, version: 100, user: 100, audit: 1, test: 1, notice: 1 },
+    seq: { teacher: 100, student: 1000, version: 100, user: 100, audit: 1, test: 1, notice: 1, draft: 1 },
     settings: {
       academy: { name: '오늘학원' },
       slots: seed.slots.length ? seed.slots : [
@@ -106,6 +106,7 @@ async function loadDb() {
     worklogs: {},
     tests: [],
     notices: [],
+    drafts: [],
     audit: [],
   };
   save();
@@ -321,7 +322,30 @@ const local = {
       const u = auth(true);
       audit(u.login_id, 'export');
       return { exported_at: new Date().toISOString(), settings: db.settings, teachers: db.teachers, students: db.students,
-        versions: db.versions, worklogs: Object.values(db.worklogs), tests: db.tests, notices: db.notices };
+        versions: db.versions, worklogs: Object.values(db.worklogs), tests: db.tests, notices: db.notices, drafts: db.drafts };
+    },
+    api_get_drafts() {
+      auth(true);
+      return [...db.drafts].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    },
+    api_save_draft({ p }) {
+      const u = auth(true);
+      const now = new Date().toISOString();
+      const isNew = p.id == null;
+      const { changes, confirm, ...row } = p;
+      const cur = isNew ? null : db.drafts.find((d) => d.id === p.id);
+      if (!isNew && !cur) throw new ApiError('NOT_FOUND');
+      const r = upsert(db.drafts, isNew
+        ? { title: '', memo: '', grid: {}, confirmed_from: null, confirmed_at: null, ...row, created_by: u.login_id, created_at: now, updated_at: now, updated_by: u.login_id }
+        : { ...row, confirmed_from: confirm ? p.confirmed_from : cur.confirmed_from, confirmed_at: confirm ? now : cur.confirmed_at, updated_at: now, updated_by: u.login_id }, 'draft');
+      audit(u.login_id, isNew ? 'draft_create' : confirm ? 'draft_confirm' : 'draft_update', r.title, { changes, confirmed_from: r.confirmed_from });
+      return r;
+    },
+    api_delete_draft({ p_id }) {
+      const u = auth(true);
+      const d = db.drafts.find((x) => x.id === p_id);
+      db.drafts = db.drafts.filter((x) => x.id !== p_id);
+      audit(u.login_id, 'draft_delete', d?.title || '');
     },
     api_get_notices() {
       const u = auth();
@@ -414,6 +438,9 @@ export const api = {
   exportAll: () => c('api_export'),
   getTests: (from, to) => c('api_get_tests', { p_from: from, p_to: to }),
   getNotices: () => c('api_get_notices'),
+  getDrafts: () => c('api_get_drafts'),
+  saveDraft: (p) => c('api_save_draft', { p }),
+  deleteDraft: (id) => c('api_delete_draft', { p_id: id }),
   saveNotice: (p) => c('api_save_notice', { p }),
   deleteNotice: (id) => c('api_delete_notice', { p_id: id }),
   ackNotice: (id) => c('api_ack_notice', { p_id: id }),

@@ -541,3 +541,10 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
   .wl-common input { grid-column: 1 / -1; }
   .wl-common button { grid-column: 1 / -1; }
 }
+
+/* 예비 시간표 */
+.tt-modes button.on { background: var(--logo-orange); color: #fff; }
+.draft-info { padding: 8px 12px; margin: 0 0 10px; border-radius: 8px; background: var(--warn-soft); border: 1px dashed var(--logo-orange); font-size: 14px; }
+.draft-info .diff-count b { color: var(--danger); }
+.tt .cell.cell-diff { box-shadow: inset 0 0 0 3px var(--logo-yellow); }
+.cf-list { max-height: 40vh; overflow: auto; background: var(--surface-2); padding: 8px 10px; border-radius: 8px; }

@@ -164,6 +164,27 @@ ok('no token → history blocked', (await call('api_student_history', { p_token:
   ok('notices do not touch worklogs', (await db.query(`select count(*)::int n from worklogs`)).rows[0].n === before);
 }
 
+// 예비 시간표 (관리자 전용)
+{
+  const ts = (await call('api_login', { p_login: 'su', p_password: 'today1234' })).token;
+  const vBefore = (await db.query(`select count(*)::int n, md5(string_agg(grid::text, '|' order by id)) h from timetable_versions`)).rows[0];
+  r = await call('api_save_draft', { p_token: at, p: { title: '12월 예비', grid: { 1: { p1: { 1: { items: [1, 2], note: '' } } } }, base_version_id: 1 } });
+  ok('admin creates draft', r.id > 0 && r.created_by === 'admin', r.EXC || '');
+  const did = r.id;
+  r = await call('api_save_draft', { p_token: at, p: { ...r, title: '12월 예비 v2', changes: ['월 2:00 +3'] } });
+  ok('admin updates draft', r.title === '12월 예비 v2' && r.confirmed_from === null);
+  ok('teacher cannot read drafts', (await call('api_get_drafts', { p_token: ts })).EXC === 'FORBIDDEN');
+  ok('teacher cannot save draft', (await call('api_save_draft', { p_token: ts, p: { title: 'x' } })).EXC === 'FORBIDDEN');
+  ok('drafts not in teacher bootstrap', !JSON.stringify(await call('api_bootstrap', { p_token: ts })).includes('12월 예비'));
+  r = await call('api_save_draft', { p_token: at, p: { ...r, confirm: true, confirmed_from: '2026-12-01' } });
+  ok('draft confirm recorded', r.confirmed_from === '2026-12-01' && !!r.confirmed_at);
+  ok('confirm audited', (await db.query(`select action from audit_log order by id desc limit 1`)).rows[0].action === 'draft_confirm');
+  const vAfter = (await db.query(`select count(*)::int n, md5(string_agg(grid::text, '|' order by id)) h from timetable_versions`)).rows[0];
+  ok('draft actions do not touch versions', vBefore.n === vAfter.n && vBefore.h === vAfter.h);
+  ok('export includes drafts', (await call('api_export', { p_token: at })).drafts.length === 1);
+  ok('admin deletes draft', !(await call('api_delete_draft', { p_token: at, p_id: did }))?.EXC && (await call('api_get_drafts', { p_token: at })).length === 0);
+}
+
 // 기타
 ok('audit', (await call('api_get_audit', { p_token: at, p_from: '2026-01-01', p_to: '2030-12-31', p_limit: 100 })).length > 10);
 ok('export', (await call('api_export', { p_token: at })).students.length === 71);
