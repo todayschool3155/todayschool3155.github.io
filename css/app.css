@@ -552,4 +552,7 @@ body.printing #print-root { display: block; position: fixed; left: -10000px; top
 .draft-check .chk-item { padding: 1px 8px; border-radius: 10px; background: var(--bg, #f5f5f5); white-space: nowrap; }
 .badge-miss { background: #fde8e8; color: #c0392b; }
 .badge-dup { background: #fff1d6; color: #b9770e; }
+.dup-mark { color: #d35400; font-weight: 800; font-size: 1em; margin-left: 1px; }
+sup.dup-mark { font-size: 0.95em; line-height: 0; vertical-align: 0.25em; }
+.chip.chip-dup { color: #d35400; font-weight: 700; overflow: visible; position: relative; z-index: 2; }
 .cf-list { max-height: 40vh; overflow: auto; background: var(--surface-2); padding: 8px 10px; border-radius: 8px; }

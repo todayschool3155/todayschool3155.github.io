@@ -1,12 +1,12 @@
 // 학생 관리: 신규 등록(개별/일괄), 수정, 퇴원(시간표 자동 제거), 재등록, 시간표 배치
-import { api } from '../api.js?v=202611242347';
+import { api } from '../api.js?v=202611242359';
 import {
   state, reload, versionFor, placementsOf, placementText, removeFromGrid, applyFromDate, cellOf, setCell,
   slots, gridTeachers, DAYS,
-} from '../store.js?v=202611242347';
-import { esc, $, today, fmtDate, toast, guard, modal, formModal, confirmBox, DAY_NAMES } from '../util.js?v=202611242347';
-import { exportStudentsXlsx } from '../excel.js?v=202611242347';
-import { studentLink } from '../studentcard.js?v=202611242347';
+} from '../store.js?v=202611242359';
+import { esc, $, today, fmtDate, toast, guard, modal, formModal, confirmBox, DAY_NAMES } from '../util.js?v=202611242359';
+import { exportStudentsXlsx } from '../excel.js?v=202611242359';
+import { studentLink } from '../studentcard.js?v=202611242359';
 
 let root, q = '', status = 'active', grade = '';
 
