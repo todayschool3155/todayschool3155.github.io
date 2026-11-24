@@ -1,13 +1,13 @@
 // 시간표: 보기(요일별/선생님별/주간) + 편집(관리자: 전체 / 선생님: 본인 칸만) + 예비 시간표(관리자 전용 초안 → 확정)
-import { api } from '../api.js?v=202611250007';
+import { api } from '../api.js?v=202611250012';
 import {
   state, reload, isAdmin, slots, slotById, teacherById, studentById, activeStudents, gridTeachers,
   versionFor, nextVersionAfter, cellOf, setCell, itemLabel, isStudentItem, placementsOf, placementText, DAYS,
-} from '../store.js?v=202611250007';
-import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611250007';
-import { printTimetable } from '../print.js?v=202611250007';
-import { exportTimetableXlsx } from '../excel.js?v=202611250007';
-import { studentLink } from '../studentcard.js?v=202611250007';
+} from '../store.js?v=202611250012';
+import { esc, $, $$, today, weekday, DAY_NAMES, fmtDate, fmtDateTime, toast, guard, modal, formModal, confirmBox, addDays } from '../util.js?v=202611250012';
+import { printTimetable } from '../print.js?v=202611250012';
+import { exportTimetableXlsx } from '../excel.js?v=202611250012';
+import { studentLink } from '../studentcard.js?v=202611250012';
 
 const pref = (k, d) => { try { return localStorage.getItem('tt_' + k) ?? d; } catch { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('tt_' + k, v); } catch {} };
@@ -658,7 +658,13 @@ async function printDialog() {
       options: [{ value: '', label: '전체 선생님' }, ...ts.map((t) => ({ value: t.id, label: t.name }))] },
   ], { ok: '인쇄' });
   if (!f) return;
-  printTimetable(v, f.mode, f.teacher ? [Number(f.teacher)] : ts.map((t) => t.id));
+  // 예비 시간표: 겹침(중복) 목록과 이름 옆 * 도 함께 인쇄
+  let dup = null;
+  if (draftMode) {
+    const { dups, dupKeys } = draftChecks(v.grid);
+    dup = { keys: dupKeys, list: dups.map(({ d, s, it, ts: tt }) => ({ d, slot: s.id, tids: tt, text: `${DAY_NAMES[d]} ${s.label} ${itemLabel(it)} (${tt.map((t) => teacherById(t)?.name || t).join('·')})` })) };
+  }
+  printTimetable(v, f.mode, f.teacher ? [Number(f.teacher)] : ts.map((t) => t.id), { dup, draft: draftMode });
 }
 
 // ---------- 예비 시간표 (관리자 전용) ----------

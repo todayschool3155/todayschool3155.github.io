@@ -1,7 +1,7 @@
 // A4 인쇄: 업무일지(일자·선생님별 1장, 세로), 시간표(주간 가로 / 요일별·선생님별 세로)
-import { state, slots, slotById, teacherById, studentById, cellOf, itemLabel, isStudentItem, logRows, versionFor, academyName, DAYS, dayOfDate } from './store.js?v=202611250007';
-import { esc, fmtDate, fmtDateTime, DAY_NAMES } from './util.js?v=202611250007';
-import { lineChart, num } from './chart.js?v=202611250007';
+import { state, slots, slotById, teacherById, studentById, cellOf, itemLabel, isStudentItem, logRows, versionFor, academyName, DAYS, dayOfDate } from './store.js?v=202611250012';
+import { esc, fmtDate, fmtDateTime, DAY_NAMES } from './util.js?v=202611250012';
+import { lineChart, num } from './chart.js?v=202611250012';
 
 function run(html, orientation) {
   const rootEl = document.getElementById('print-root');
@@ -126,20 +126,28 @@ export function printWorklogs(pages) {
 }
 
 // ---------- 시간표 ----------
+let dupKeys = null; // 예비 시간표 인쇄 시 겹치는 학생 (`요일|교시|학생id`)
 function cellHtml(v, d, s, tid) {
   const c = cellOf(v.grid, d, s, tid);
   return `<td>${c.note ? `<div class="pp-note">${esc(c.note)}</div>` : ''}${c.items.map((it) => {
     const st = isStudentItem(it) ? studentById(it) : null;
-    return `<div class="${!isStudentItem(it) ? 'pp-label' : 'pp-sn'} ${st && st.status !== 'active' ? 'pp-out' : ''}">${esc(itemLabel(it))}</div>`;
+    const dup = st && dupKeys?.has(`${d}|${s}|${it}`);
+    return `<div class="${!isStudentItem(it) ? 'pp-label' : 'pp-sn'} ${st && st.status !== 'active' ? 'pp-out' : ''} ${dup ? 'pp-dup' : ''}">${esc(itemLabel(it))}${dup ? '*' : ''}</div>`;
   }).join('')}</td>`;
 }
 const slotTh = (s) => `<th class="pp-slot">${esc(s.label)}${s.time ? `<small>${esc(s.time)}</small>` : ''}</th>`;
 const tth = (t, text) => `<th style="background:#fff;border-bottom:1.2mm solid ${esc(t.color)}">${esc(text)}</th>`;
 
-export function printTimetable(v, mode, tids) {
+export function printTimetable(v, mode, tids, { dup = null, draft = false } = {}) {
   const ts = tids.map(teacherById).filter(Boolean);
-  const title = (sub) => `<header class="pp-head"><h1><img class="pp-logo" src="img/mark.png" alt="">${esc(academyName())} 시간표 ${sub ? '· ' + esc(sub) : ''}</h1>
-    <p>적용일 ${fmtDate(v.effective_from)} ${esc(v.title || '')}</p></header>`;
+  dupKeys = dup?.keys || null;
+  // 겹침 목록: 그 페이지에 해당하는 것만 (주간=전체, 요일별=그 요일, 선생님별=그 선생님이 낀 것)
+  const dupBox = (pick) => {
+    const list = (dup?.list || []).filter(pick);
+    return list.length ? `<div class="pp-dups"><b>겹침(중복) ${list.length}건</b> · 이름 옆 * 표시 — ${list.map((x) => esc(x.text)).join(' / ')}</div>` : '';
+  };
+  const title = (sub, pick = () => true) => `<header class="pp-head"><h1><img class="pp-logo" src="img/mark.png" alt="">${esc(academyName())} ${draft ? '예비 시간표' : '시간표'} ${sub ? '· ' + esc(sub) : ''}</h1>
+    <p>${draft ? `<b>확정 전</b> ${esc(v.title || '')}` : `적용일 ${fmtDate(v.effective_from)} ${esc(v.title || '')}`}</p></header>${dupBox(pick)}`;
   let html = '';
   if (mode === 'week') {
     html = `<section class="page page-land tt-fit"><div>
@@ -152,11 +160,11 @@ export function printTimetable(v, mode, tids) {
     return run(html, 'landscape');
   }
   if (mode === 'days') {
-    html = DAYS.map((d) => `<section class="page tt-fit"><div>${title(DAY_NAMES[d] + '요일')}
+    html = DAYS.map((d) => `<section class="page tt-fit"><div>${title(DAY_NAMES[d] + '요일', (x) => x.d === d)}
       <table class="pp-tt"><thead><tr><th>교시</th>${ts.map((t) => tth(t, t.name)).join('')}</tr></thead>
       <tbody>${slots().map((s) => `<tr>${slotTh(s)}${ts.map((t) => cellHtml(v, d, s.id, t.id)).join('')}</tr>`).join('')}</tbody></table>${stamp()}</div></section>`).join('');
   } else {
-    html = ts.map((t) => `<section class="page tt-fit"><div>${title(t.name)}
+    html = ts.map((t) => `<section class="page tt-fit"><div>${title(t.name, (x) => x.tids.includes(t.id))}
       <table class="pp-tt"><thead><tr><th>교시</th>${DAYS.map((d) => tth(t, DAY_NAMES[d])).join('')}</tr></thead>
       <tbody>${slots().map((s) => `<tr>${slotTh(s)}${DAYS.map((d) => cellHtml(v, d, s.id, t.id)).join('')}</tr>`).join('')}</tbody></table>${stamp()}</div></section>`).join('');
   }
